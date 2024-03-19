@@ -33,5 +33,6 @@ pub(crate) mod pbes1;
 pub type Result<T> = std::result::Result<T, error::Error>;
 
 pub use keystore::{
-    Certificate, EncryptionAlgorithm, KeyStore, KeyStoreEntry, MacAlgorithm, PrivateKeyChain,
+    Certificate, EncryptionAlgorithm, KeyStore, KeyStoreEntry, MacAlgorithm, Pkcs12Writer,
+    PrivateKeyChain,
 };
