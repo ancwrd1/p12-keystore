@@ -1,0 +1,27 @@
+[package]
+name = "p12-keystore"
+description = "Convenient API to work with PKCS#12 files"
+version = "0.1.0"
+authors = ["Dmitry Pankratov <dmitry@pankratov.net>"]
+license = "MIT/Apache-2.0"
+repository = "https://github.com/ancwrd1/p12-keystore"
+documentation = "https://docs.rs/p12-keystore"
+readme = "README.md"
+keywords = ["pkcs12", "pfx", "keystore", "truststore"]
+edition = "2021"
+
+[dependencies]
+pkcs5 = { version = "0.7", features = ["alloc", "pbes2"]}
+pkcs12 = {  version = "0.1", features = ["kdf"] }
+cms = "0.2"
+der = { version = "0.7", features = ["std"] }
+thiserror = "1"
+cbc = { version = "0.1", features = ["block-padding", "alloc"] }
+rc2 = "0.8"
+des = "0.8"
+sha1 = "0.10"
+sha2 = "0.10"
+x509-parser = "0.16"
+hex = "0.4"
+hmac = "0.12"
+rand = "0.8"

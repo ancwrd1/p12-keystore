@@ -1,0 +1,76 @@
+use cbc::cipher::{
+    block_padding::Pkcs7, BlockCipher, BlockDecrypt, BlockDecryptMut, BlockEncrypt,
+    BlockEncryptMut, KeyInit, KeyIvInit,
+};
+use der::oid::ObjectIdentifier;
+use des::TdesEde3;
+use pkcs12::kdf;
+use rc2::Rc2;
+use sha1::Sha1;
+
+use crate::{error::Error, oid, Result};
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum PbeMode {
+    Encrypt,
+    Decrypt,
+}
+
+pub struct Pbes1<'a> {
+    alg_oid: ObjectIdentifier,
+    salt: &'a [u8],
+    iterations: u64,
+    mode: PbeMode,
+}
+
+impl<'a> Pbes1<'a> {
+    pub fn new(alg_oid: ObjectIdentifier, salt: &'a [u8], iterations: u64, mode: PbeMode) -> Self {
+        Self {
+            alg_oid,
+            salt,
+            iterations,
+            mode,
+        }
+    }
+
+    fn cbc<T>(&self, data: &[u8], password: &str, size: usize) -> Result<Vec<u8>>
+    where
+        T: KeyInit + Sized + BlockCipher + BlockEncrypt + BlockDecrypt,
+    {
+        let key = kdf::derive_key_utf8::<Sha1>(
+            password,
+            self.salt,
+            kdf::Pkcs12KeyType::EncryptionKey,
+            self.iterations as _,
+            size,
+        )?;
+
+        let iv = kdf::derive_key_utf8::<Sha1>(
+            password,
+            self.salt,
+            kdf::Pkcs12KeyType::Iv,
+            self.iterations as _,
+            8,
+        )?;
+
+        if self.mode == PbeMode::Encrypt {
+            let cipher = cbc::Encryptor::<T>::new_from_slices(&key, &iv)?;
+            Ok(cipher.encrypt_padded_vec_mut::<Pkcs7>(data))
+        } else {
+            let cipher = cbc::Decryptor::<T>::new_from_slices(&key, &iv)?;
+            Ok(cipher
+                .decrypt_padded_vec_mut::<Pkcs7>(data)
+                .map_err(|_| Error::UnpadError)?)
+        }
+    }
+
+    pub fn encrypt_decrypt(&self, data: &[u8], password: &str) -> Result<Vec<u8>> {
+        match self.alg_oid {
+            oid::PBE_WITH_SHA_AND3_KEY_TRIPLE_DES_CBC_OID => {
+                self.cbc::<TdesEde3>(data, password, 24)
+            }
+            oid::PBE_WITH_SHA_AND_40BIT_RC2_CBC_OID => self.cbc::<Rc2>(data, password, 5),
+            _ => Err(Error::UnsupportedEncryptionScheme),
+        }
+    }
+}
