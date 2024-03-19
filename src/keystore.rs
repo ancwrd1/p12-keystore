@@ -266,6 +266,7 @@ impl KeyStore {
 
 /// Encryption algorithm to use when creating the PKCS#12 file
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum EncryptionAlgorithm {
     PbeWithHmacSha256AndAes256,
     PbeWithShaAnd40BitRc4Cbc,

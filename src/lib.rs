@@ -27,6 +27,7 @@ pub(crate) mod codec;
 pub mod error;
 pub(crate) mod keystore;
 pub(crate) mod oid;
+#[cfg(feature = "pbes1")]
 pub(crate) mod pbes1;
 
 /// Result type for keystore operations

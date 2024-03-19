@@ -9,7 +9,7 @@ use cms::{
 };
 use der::{
     asn1::{BmpString, ContextSpecific, ObjectIdentifier, OctetString, OctetStringRef, SetOfVec},
-    Any, Decode, Encode, Reader, SliceReader, SliceWriter,
+    Any, Decode, Encode,
 };
 use hmac::{digest::Digest, Mac};
 use pkcs12::{
@@ -25,12 +25,16 @@ use rand::random;
 use sha1::Sha1;
 use sha2::Sha256;
 
+#[cfg(feature = "pbes1")]
+use {
+    crate::pbes1::{PbeMode, Pbes1},
+    der::{Reader, SliceReader, SliceWriter},
+};
+
 use crate::{
     error::Error,
     keystore::{Certificate, EncryptionAlgorithm, MacAlgorithm, PrivateKeyChain},
-    oid,
-    pbes1::{PbeMode, Pbes1},
-    Result,
+    oid, Result,
 };
 
 pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()> {
@@ -43,7 +47,8 @@ pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()>
                 mac_data.iterations as _,
                 Sha1::output_size(),
             )?;
-            let mut hmac = hmac::Hmac::<Sha1>::new_from_slice(&key)?;
+            let mut hmac =
+                hmac::Hmac::<Sha1>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
             hmac.update(data);
             hmac.verify_slice(mac_data.mac.digest.as_bytes())?;
             Ok(())
@@ -56,7 +61,8 @@ pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()>
                 mac_data.iterations as _,
                 Sha256::output_size(),
             )?;
-            let mut hmac = hmac::Hmac::<Sha256>::new_from_slice(&key)?;
+            let mut hmac =
+                hmac::Hmac::<Sha256>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
             hmac.update(data);
             hmac.verify_slice(mac_data.mac.digest.as_bytes())?;
             Ok(())
@@ -118,6 +124,7 @@ fn decrypt(alg: &AlgorithmIdentifierOwned, data: &[u8], password: &str) -> Resul
                 .decrypt(password.as_bytes(), data)
                 .map_err(|e| Error::Pkcs5Error(format!("{}", e)))?)
         }
+        #[cfg(feature = "pbes1")]
         oid::PBE_WITH_SHA_AND_40BIT_RC2_CBC_OID | oid::PBE_WITH_SHA_AND3_KEY_TRIPLE_DES_CBC_OID => {
             let params = alg
                 .parameters
@@ -162,7 +169,9 @@ fn encrypt(
 
             Ok((alg_id, encrypted))
         }
-        _ => {
+        #[cfg(feature = "pbes1")]
+        EncryptionAlgorithm::PbeWithShaAnd40BitRc4Cbc
+        | EncryptionAlgorithm::PbeWithShaAnd3KeyTripleDesCbc => {
             let salt: [u8; 20] = random();
             let encrypted = Pbes1::new(alg.to_oid(), &salt, iterations, PbeMode::Encrypt)
                 .encrypt_decrypt(data, password)?;
@@ -187,6 +196,8 @@ fn encrypt(
             };
             Ok((alg_id, encrypted))
         }
+        #[cfg(not(feature = "pbes1"))]
+        _ => Err(Error::UnsupportedEncryptionScheme),
     }
 }
 
@@ -404,7 +415,8 @@ pub fn compute_mac(
                 iterations as _,
                 Sha1::output_size(),
             )?;
-            let mut hmac = hmac::Hmac::<Sha1>::new_from_slice(&key)?;
+            let mut hmac =
+                hmac::Hmac::<Sha1>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
             hmac.update(data);
             (
                 oid::SHA1_OID,
@@ -421,7 +433,8 @@ pub fn compute_mac(
                 iterations as _,
                 Sha256::output_size(),
             )?;
-            let mut hmac = hmac::Hmac::<Sha256>::new_from_slice(&key)?;
+            let mut hmac =
+                hmac::Hmac::<Sha256>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
             hmac.update(data);
             (
                 oid::SHA256_OID,

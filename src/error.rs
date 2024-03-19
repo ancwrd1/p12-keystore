@@ -3,7 +3,6 @@
 //!
 use std::io;
 
-use cbc::cipher::InvalidLength;
 use hmac::digest::MacError;
 use x509_parser::error::X509Error;
 
@@ -28,10 +27,10 @@ pub enum Error {
     #[error(transparent)]
     X509Error(#[from] x509_parser::nom::Err<X509Error>),
 
-    #[error(transparent)]
-    InvalidLength(#[from] InvalidLength),
+    #[error("Invalid length")]
+    InvalidLength,
 
-    #[error("Unpadding error, decryption failed")]
+    #[error("Unpad error")]
     UnpadError,
 
     #[error("Invalid parameters")]

@@ -1,3 +1,5 @@
+#![cfg(feature = "pbes1")]
+
 use cbc::cipher::{
     block_padding::Pkcs7, BlockCipher, BlockDecrypt, BlockDecryptMut, BlockEncrypt,
     BlockEncryptMut, KeyInit, KeyIvInit,
@@ -54,10 +56,12 @@ impl<'a> Pbes1<'a> {
         )?;
 
         if self.mode == PbeMode::Encrypt {
-            let cipher = cbc::Encryptor::<T>::new_from_slices(&key, &iv)?;
+            let cipher = cbc::Encryptor::<T>::new_from_slices(&key, &iv)
+                .map_err(|_| Error::InvalidLength)?;
             Ok(cipher.encrypt_padded_vec_mut::<Pkcs7>(data))
         } else {
-            let cipher = cbc::Decryptor::<T>::new_from_slices(&key, &iv)?;
+            let cipher = cbc::Decryptor::<T>::new_from_slices(&key, &iv)
+                .map_err(|_| Error::InvalidLength)?;
             Ok(cipher
                 .decrypt_padded_vec_mut::<Pkcs7>(data)
                 .map_err(|_| Error::UnpadError)?)

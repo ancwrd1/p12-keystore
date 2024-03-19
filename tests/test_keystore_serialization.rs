@@ -104,7 +104,7 @@ fn test_write_pbes1_40rc2_keystore() {
 fn test_write_pbes2_keystore() {
     common_write_test(
         "aes256-sha1",
-        PBES1_KEYSTORE,
+        PBES2_KEYSTORE,
         EncryptionAlgorithm::PbeWithHmacSha256AndAes256,
         ITERATIONS,
         MacAlgorithm::HmacSha1,
@@ -113,7 +113,7 @@ fn test_write_pbes2_keystore() {
 
     common_write_test(
         "aes256-sha256",
-        PBES1_KEYSTORE,
+        PBES2_KEYSTORE,
         EncryptionAlgorithm::PbeWithHmacSha256AndAes256,
         ITERATIONS,
         MacAlgorithm::HmacSha256,
@@ -166,7 +166,7 @@ fn test_write_pbes1_40rc2_truststore() {
 fn test_write_pbes2_truststore() {
     common_write_test(
         "aes256-sha1",
-        PBES1_TRUSTSTORE,
+        PBES2_TRUSTSTORE,
         EncryptionAlgorithm::PbeWithHmacSha256AndAes256,
         ITERATIONS,
         MacAlgorithm::HmacSha1,
@@ -175,7 +175,7 @@ fn test_write_pbes2_truststore() {
 
     common_write_test(
         "aes256-sha256",
-        PBES1_TRUSTSTORE,
+        PBES2_TRUSTSTORE,
         EncryptionAlgorithm::PbeWithHmacSha256AndAes256,
         ITERATIONS,
         MacAlgorithm::HmacSha256,
