@@ -34,6 +34,7 @@ fn test_keystore_api() {
 
     new_store.add_entry("c1", KeyStoreEntry::Certificate(cert.clone()));
     new_store.add_entry("c2", KeyStoreEntry::Certificate(cert.clone()));
+    assert_eq!(new_store.entries_count(), 2);
     assert_eq!(new_store.entries().collect::<Vec<_>>().len(), 2);
 
     new_store.delete_entry("c1");
@@ -49,14 +50,17 @@ fn test_keystore_api() {
     assert_ne!(new_store.entry("e1"), new_store.entry("e2"));
 
     new_store.add_entry("c1", KeyStoreEntry::Certificate(cert.clone()));
+    new_store.rename_entry("c1", "c2");
 
     let pfx = new_store.writer("mypwd").write().unwrap();
     let reloaded = KeyStore::from_pkcs12(&pfx, "mypwd").unwrap();
 
     assert!(matches!(
-        reloaded.entry("c1"),
+        reloaded.entry("c2"),
         Some(KeyStoreEntry::Certificate(_))
     ));
+
+    assert!(reloaded.entry("c1").is_none());
 
     assert!(matches!(
         reloaded.entry("e1"),

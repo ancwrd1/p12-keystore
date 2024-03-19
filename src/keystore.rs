@@ -82,17 +82,17 @@ impl PrivateKeyChain {
         }
     }
 
-    /// Return private key data
+    /// Get private key data
     pub fn key(&self) -> &[u8] {
         &self.key
     }
 
-    /// Return a slice of certificates
+    /// Get a slice of certificates
     pub fn chain(&self) -> &[Certificate] {
         &self.chain
     }
 
-    /// Return key id
+    /// Get local key id
     pub fn local_key_id(&self) -> &[u8] {
         &self.local_key_id
     }
@@ -227,18 +227,18 @@ impl KeyStore {
         }
     }
 
-    /// Return entries iterator
+    /// Get entries iterator
     pub fn entries(&self) -> Entries {
         let iter = self.entries.iter();
         Entries { iter }
     }
 
-    /// Return an entry for a given alias
+    /// Get an entry for a given alias
     pub fn entry(&self, alias: &str) -> Option<&KeyStoreEntry> {
         self.entries.get(alias)
     }
 
-    /// Return entries count in the keystore
+    /// Get entries count in the keystore
     pub fn entries_count(&self) -> usize {
         self.entries.len()
     }
