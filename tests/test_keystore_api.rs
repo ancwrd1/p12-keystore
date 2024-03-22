@@ -44,6 +44,7 @@ fn test_keystore_api() {
     new_store.add_entry("e1", KeyStoreEntry::PrivateKeyChain(chains[0].clone()));
     assert_eq!(new_store.entries().collect::<Vec<_>>().len(), 1);
     assert!(new_store.entry("e1").is_some());
+    assert_eq!(new_store.private_key_chain(), chains.first().map(|c| ("e1", c)));
 
     new_store.add_entry("e2", KeyStoreEntry::PrivateKeyChain(chains[1].clone()));
     assert_eq!(new_store.entries().collect::<Vec<_>>().len(), 2);

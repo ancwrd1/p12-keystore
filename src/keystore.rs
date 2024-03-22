@@ -262,6 +262,14 @@ impl KeyStore {
             None
         }
     }
+
+    /// Get the first private keychain
+    pub fn private_key_chain(&self) -> Option<(&str, &PrivateKeyChain)> {
+        self.entries().find_map(|(alias, entry)| match entry {
+            KeyStoreEntry::PrivateKeyChain(chain) => Some((alias.as_str(), chain)),
+            KeyStoreEntry::Certificate(_) => None,
+        })
+    }
 }
 
 /// Encryption algorithm to use when creating the PKCS#12 file
