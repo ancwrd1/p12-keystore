@@ -11,6 +11,7 @@ use pkcs12::{
     pfx::{Pfx, Version},
 };
 
+use crate::codec::ParsedAuthSafe;
 use crate::{codec, error::Error, oid, Result};
 
 /// X.509 certificate wrapper
@@ -129,7 +130,7 @@ impl<'a> Iterator for Entries<'a> {
 }
 
 /// KeyStore holds a dictionary of [KeyStoreEntry] instances indexed by aliases (names)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct KeyStore {
     entries: BTreeMap<String, KeyStoreEntry>,
 }
@@ -137,9 +138,7 @@ pub struct KeyStore {
 impl KeyStore {
     /// Create new empty keystore
     pub fn new() -> Self {
-        Self {
-            entries: Default::default(),
-        }
+        Self::default()
     }
 
     /// Parse keystore from PKCS#12 data
@@ -164,36 +163,43 @@ impl KeyStore {
 
         let mut keystore = Self::new();
 
-        let mut keys = Vec::new();
-        let mut certs = Vec::new();
+        let mut parsed_keys = Vec::new();
+        let mut parsed_certs = Vec::new();
 
         for safe in safes.into_iter() {
-            let (safe_keys, safe_certs) = codec::parse_auth_safe(&safe, password)?;
-            keys.extend(safe_keys);
-            certs.extend(safe_certs);
+            let ParsedAuthSafe { keys, certs } = codec::parse_auth_safe(&safe, password)?;
+            parsed_keys.extend(keys);
+            parsed_certs.extend(certs);
         }
 
         let find_cert_by_key = |key: &[u8]| {
-            certs
+            parsed_certs
                 .iter()
-                .find(|c| c.1.as_ref().is_some_and(|k| k.as_slice() == key))
+                .find(|c| c.local_key_id.as_ref().is_some_and(|k| k.as_slice() == key))
         };
 
-        let find_issuer = |issuer: &str| certs.iter().find(|c| c.3.subject == issuer && !c.2);
+        let find_issuer = |issuer: &str| {
+            parsed_certs
+                .iter()
+                .find(|c| c.cert.subject == issuer && !c.trusted)
+        };
 
-        for (alias, key) in keys {
-            if let Some(mut entry) = find_cert_by_key(&key.local_key_id) {
-                let alias = alias.as_deref().unwrap_or_else(|| entry.3.subject.as_ref());
+        for key in parsed_keys {
+            if let Some(mut entry) = find_cert_by_key(&key.key.local_key_id) {
+                let alias = key
+                    .friendly_name
+                    .as_deref()
+                    .unwrap_or_else(|| entry.cert.subject.as_ref());
 
                 let mut key_chain = PrivateKeyChain {
-                    key: key.key,
-                    local_key_id: key.local_key_id,
-                    chain: vec![entry.3.clone()],
+                    key: key.key.key,
+                    local_key_id: key.key.local_key_id,
+                    chain: vec![entry.cert.clone()],
                 };
 
-                while let Some(issuer) = find_issuer(&entry.3.issuer) {
-                    key_chain.chain.push(issuer.3.clone());
-                    if issuer.3.issuer == issuer.3.subject {
+                while let Some(issuer) = find_issuer(&entry.cert.issuer) {
+                    key_chain.chain.push(issuer.cert.clone());
+                    if issuer.cert.issuer == issuer.cert.subject {
                         break;
                     }
                     entry = issuer;
@@ -202,12 +208,13 @@ impl KeyStore {
             }
         }
 
-        for (friendly_name, local_key_id, trusted, cert) in certs {
-            if local_key_id.is_none() && trusted {
-                let alias = friendly_name
+        for cert in parsed_certs {
+            if cert.local_key_id.is_none() && cert.trusted {
+                let alias = cert
+                    .friendly_name
                     .clone()
-                    .unwrap_or_else(|| cert.subject.clone());
-                keystore.add_entry(&alias, KeyStoreEntry::Certificate(cert));
+                    .unwrap_or_else(|| cert.cert.subject.clone());
+                keystore.add_entry(&alias, KeyStoreEntry::Certificate(cert.cert));
             }
         }
 
@@ -282,7 +289,7 @@ pub enum EncryptionAlgorithm {
 }
 
 impl EncryptionAlgorithm {
-    pub(crate) fn to_oid(&self) -> ObjectIdentifier {
+    pub(crate) fn as_oid(&self) -> ObjectIdentifier {
         match self {
             EncryptionAlgorithm::PbeWithHmacSha256AndAes256 => oid::PBES2_OID,
             EncryptionAlgorithm::PbeWithShaAnd40BitRc4Cbc => {

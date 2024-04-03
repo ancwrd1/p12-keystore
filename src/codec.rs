@@ -37,12 +37,29 @@ use crate::{
     oid, Result,
 };
 
+pub(crate) struct ParsedKeyChain {
+    pub(crate) friendly_name: Option<String>,
+    pub(crate) key: PrivateKeyChain,
+}
+
+pub(crate) struct ParsedCertificate {
+    pub(crate) friendly_name: Option<String>,
+    pub(crate) local_key_id: Option<Vec<u8>>,
+    pub(crate) trusted: bool,
+    pub(crate) cert: Certificate,
+}
+
+pub(crate) struct ParsedAuthSafe {
+    pub(crate) keys: Vec<ParsedKeyChain>,
+    pub(crate) certs: Vec<ParsedCertificate>,
+}
+
 pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()> {
     match mac_data.mac.algorithm.oid {
         oid::SHA1_OID => {
             let key = kdf::derive_key_utf8::<Sha1>(
                 password,
-                &mac_data.mac_salt.as_bytes(),
+                mac_data.mac_salt.as_bytes(),
                 kdf::Pkcs12KeyType::Mac,
                 mac_data.iterations as _,
                 Sha1::output_size(),
@@ -56,7 +73,7 @@ pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()>
         oid::SHA256_OID => {
             let key = kdf::derive_key_utf8::<Sha256>(
                 password,
-                &mac_data.mac_salt.as_bytes(),
+                mac_data.mac_salt.as_bytes(),
                 kdf::Pkcs12KeyType::Mac,
                 mac_data.iterations as _,
                 Sha256::output_size(),
@@ -71,13 +88,7 @@ pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()>
     }
 }
 
-pub fn parse_auth_safe(
-    safe: &ContentInfo,
-    password: &str,
-) -> Result<(
-    Vec<(Option<String>, PrivateKeyChain)>,
-    Vec<(Option<String>, Option<Vec<u8>>, bool, Certificate)>,
-)> {
+pub fn parse_auth_safe(safe: &ContentInfo, password: &str) -> Result<ParsedAuthSafe> {
     let data = match safe.content_type {
         oid::CONTENT_TYPE_DATA_OID => {
             let os = OctetString::from_der(&safe.content.to_der()?)?
@@ -163,7 +174,7 @@ fn encrypt(
                 .map_err(|e| Error::Pkcs5Error(format!("{}", e)))?;
 
             let alg_id = AlgorithmIdentifierOwned {
-                oid: alg.to_oid(),
+                oid: alg.as_oid(),
                 parameters: Some(Any::from_der(&params.to_der()?)?),
             };
 
@@ -173,7 +184,7 @@ fn encrypt(
         EncryptionAlgorithm::PbeWithShaAnd40BitRc4Cbc
         | EncryptionAlgorithm::PbeWithShaAnd3KeyTripleDesCbc => {
             let salt: [u8; 20] = random();
-            let encrypted = Pbes1::new(alg.to_oid(), &salt, iterations, PbeMode::Encrypt)
+            let encrypted = Pbes1::new(alg.as_oid(), &salt, iterations, PbeMode::Encrypt)
                 .encrypt_decrypt(data, password)?;
 
             let mut buf = vec![0u8; 64];
@@ -191,7 +202,7 @@ fn encrypt(
             let params = writer.finish()?;
 
             let alg_id = AlgorithmIdentifierOwned {
-                oid: alg.to_oid(),
+                oid: alg.as_oid(),
                 parameters: Some(Any::from_der(params)?),
             };
             Ok((alg_id, encrypted))
@@ -215,13 +226,7 @@ fn get_bag_attribute(oid: &ObjectIdentifier, bag: &SafeBag) -> Option<Vec<u8>> {
     }
 }
 
-fn parse_bags(
-    bags: SafeContents,
-    password: &str,
-) -> Result<(
-    Vec<(Option<String>, PrivateKeyChain)>,
-    Vec<(Option<String>, Option<Vec<u8>>, bool, Certificate)>,
-)> {
+fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
     let mut keys = Vec::new();
     let mut certs = Vec::new();
 
@@ -247,7 +252,12 @@ fn parse_bags(
                     return Err(Error::UnsupportedCertificateType);
                 }
                 let cert = Certificate::from_der(cs.value.cert_value.as_bytes())?;
-                certs.push((friendly_name, local_key_id, trusted, cert));
+                certs.push(ParsedCertificate {
+                    friendly_name,
+                    local_key_id,
+                    trusted,
+                    cert,
+                });
             }
             oid::PKCS_12_PKCS8_KEY_BAG_OID => {
                 let cs: ContextSpecific<EncryptedPrivateKeyInfo> =
@@ -265,14 +275,14 @@ fn parse_bags(
                         local_key_id,
                         chain: vec![],
                     };
-                    keys.push((friendly_name, key));
+                    keys.push(ParsedKeyChain { friendly_name, key });
                 }
             }
             _ => {}
         }
     }
 
-    Ok((keys, certs))
+    Ok(ParsedAuthSafe { keys, certs })
 }
 
 pub fn certificate_to_safe_bag(
@@ -294,7 +304,7 @@ pub fn certificate_to_safe_bag(
 
     if let Some(local_key_id) = local_key_id {
         let local_key_id = SetOfVec::<AttributeValue>::from_iter([Any::from_der(
-            &OctetStringRef::new(&local_key_id)?.to_der()?,
+            &OctetStringRef::new(local_key_id)?.to_der()?,
         )?])?;
 
         bag_attributes.insert(Attribute {
