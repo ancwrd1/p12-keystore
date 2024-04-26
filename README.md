@@ -1,5 +1,11 @@
 # PKCS#12 library written in pure Rust
 
+[![github actions](https://github.com/ancwrd1/p12-keystore/workflows/CI/badge.svg)](https://github.com/ancwrd1/p12-keystore/actions)
+[![crates](https://img.shields.io/crates/v/p12-keystore.svg)](https://crates.io/crates/p12-keystore)
+[![license](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![docs.rs](https://docs.rs/p12-keystore/badge.svg)](https://docs.rs/p12-keystore)
+
 ## Overview
 
 This project contains a simple to use high-level library to work with PKCS#12/PFX keystores, written in pure Rust,
