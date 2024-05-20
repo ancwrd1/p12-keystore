@@ -23,12 +23,12 @@
 //! Supported MAC algorithms: [MacAlgorithm::HmacSha1], [MacAlgorithm::HmacSha256]
 //!
 
-pub(crate) mod codec;
+mod codec;
 pub mod error;
-pub(crate) mod keystore;
-pub(crate) mod oid;
+mod keystore;
+mod oid;
 #[cfg(feature = "pbes1")]
-pub(crate) mod pbes1;
+mod pbes1;
 
 /// Result type for keystore operations
 pub type Result<T> = std::result::Result<T, error::Error>;

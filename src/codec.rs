@@ -37,21 +37,21 @@ use crate::{
     oid, Result,
 };
 
-pub(crate) struct ParsedKeyChain {
-    pub(crate) friendly_name: Option<String>,
-    pub(crate) key: PrivateKeyChain,
+pub struct ParsedKeyChain {
+    pub friendly_name: Option<String>,
+    pub key: PrivateKeyChain,
 }
 
-pub(crate) struct ParsedCertificate {
-    pub(crate) friendly_name: Option<String>,
-    pub(crate) local_key_id: Option<Vec<u8>>,
-    pub(crate) trusted: bool,
-    pub(crate) cert: Certificate,
+pub struct ParsedCertificate {
+    pub friendly_name: Option<String>,
+    pub local_key_id: Option<Vec<u8>>,
+    pub trusted: bool,
+    pub cert: Certificate,
 }
 
-pub(crate) struct ParsedAuthSafe {
-    pub(crate) keys: Vec<ParsedKeyChain>,
-    pub(crate) certs: Vec<ParsedCertificate>,
+pub struct ParsedAuthSafe {
+    pub keys: Vec<ParsedKeyChain>,
+    pub certs: Vec<ParsedCertificate>,
 }
 
 pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()> {
