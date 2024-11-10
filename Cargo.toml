@@ -19,7 +19,7 @@ pkcs5 = { version = "0.7", features = ["alloc", "pbes2"]}
 pkcs12 = {  version = "0.1", features = ["kdf"] }
 cms = "0.2"
 der = { version = "0.7", features = ["std"] }
-thiserror = "1"
+thiserror = "2"
 cbc = { version = "0.1", features = ["block-padding", "alloc"], optional = true }
 rc2 = { version = "0.8", optional = true }
 des = {  version = "0.8", optional = true }
