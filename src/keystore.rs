@@ -320,7 +320,7 @@ pub struct Pkcs12Writer<'a, 'b> {
     mac_iterations: u64,
 }
 
-impl<'a, 'b> Pkcs12Writer<'a, 'b> {
+impl Pkcs12Writer<'_, '_> {
     /// Set encryption algorithm. Default is [EncryptionAlgorithm::PbeWithHmacSha256AndAes256]
     pub fn encryption_algorithm(mut self, algorithm: EncryptionAlgorithm) -> Self {
         self.encryption_algorithm = algorithm;

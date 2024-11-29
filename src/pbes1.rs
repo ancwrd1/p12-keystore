@@ -1,5 +1,3 @@
-#![cfg(feature = "pbes1")]
-
 use cbc::cipher::{
     block_padding::Pkcs7, BlockCipher, BlockDecrypt, BlockDecryptMut, BlockEncrypt,
     BlockEncryptMut, KeyInit, KeyIvInit,
