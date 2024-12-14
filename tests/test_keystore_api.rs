@@ -43,10 +43,7 @@ fn test_keystore_api() {
     new_store.add_entry("e1", KeyStoreEntry::PrivateKeyChain(chains[0].clone()));
     assert_eq!(new_store.entries().collect::<Vec<_>>().len(), 1);
     assert!(new_store.entry("e1").is_some());
-    assert_eq!(
-        new_store.private_key_chain(),
-        chains.first().map(|c| ("e1", c))
-    );
+    assert_eq!(new_store.private_key_chain(), chains.first().map(|c| ("e1", c)));
 
     new_store.add_entry("e2", KeyStoreEntry::PrivateKeyChain(chains[1].clone()));
     assert_eq!(new_store.entries().collect::<Vec<_>>().len(), 2);
@@ -58,22 +55,13 @@ fn test_keystore_api() {
     let pfx = new_store.writer("mypwd").write().unwrap();
     let reloaded = KeyStore::from_pkcs12(&pfx, "mypwd").unwrap();
 
-    assert!(matches!(
-        reloaded.entry("c2"),
-        Some(KeyStoreEntry::Certificate(_))
-    ));
+    assert!(matches!(reloaded.entry("c2"), Some(KeyStoreEntry::Certificate(_))));
 
     assert!(reloaded.entry("c1").is_none());
 
-    assert!(matches!(
-        reloaded.entry("e1"),
-        Some(KeyStoreEntry::PrivateKeyChain(_))
-    ));
+    assert!(matches!(reloaded.entry("e1"), Some(KeyStoreEntry::PrivateKeyChain(_))));
 
-    assert!(matches!(
-        reloaded.entry("e2"),
-        Some(KeyStoreEntry::PrivateKeyChain(_))
-    ));
+    assert!(matches!(reloaded.entry("e2"), Some(KeyStoreEntry::PrivateKeyChain(_))));
 
     assert_ne!(new_store.entry("e1"), new_store.entry("e2"));
 }

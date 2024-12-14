@@ -154,9 +154,7 @@ impl KeyStore {
         }
 
         let safes: AuthenticatedSafe = if pfx.auth_safe.content_type == oid::CONTENT_TYPE_DATA_OID {
-            AuthenticatedSafe::from_der(
-                &OctetString::from_der(&pfx.auth_safe.content.to_der()?)?.into_bytes(),
-            )?
+            AuthenticatedSafe::from_der(&OctetString::from_der(&pfx.auth_safe.content.to_der()?)?.into_bytes())?
         } else {
             return Err(Error::UnsupportedContentType);
         };
@@ -178,11 +176,7 @@ impl KeyStore {
                 .find(|c| c.local_key_id.as_ref().is_some_and(|k| k.as_slice() == key))
         };
 
-        let find_issuer = |issuer: &str| {
-            parsed_certs
-                .iter()
-                .find(|c| c.cert.subject == issuer && !c.trusted)
-        };
+        let find_issuer = |issuer: &str| parsed_certs.iter().find(|c| c.cert.subject == issuer && !c.trusted);
 
         for key in parsed_keys {
             if let Some(mut entry) = find_cert_by_key(&key.key.local_key_id) {
@@ -210,10 +204,7 @@ impl KeyStore {
 
         for cert in parsed_certs {
             if cert.local_key_id.is_none() && cert.trusted {
-                let alias = cert
-                    .friendly_name
-                    .clone()
-                    .unwrap_or_else(|| cert.cert.subject.clone());
+                let alias = cert.friendly_name.clone().unwrap_or_else(|| cert.cert.subject.clone());
                 keystore.add_entry(&alias, KeyStoreEntry::Certificate(cert.cert));
             }
         }
@@ -292,12 +283,8 @@ impl EncryptionAlgorithm {
     pub(crate) fn as_oid(&self) -> ObjectIdentifier {
         match self {
             EncryptionAlgorithm::PbeWithHmacSha256AndAes256 => oid::PBES2_OID,
-            EncryptionAlgorithm::PbeWithShaAnd40BitRc4Cbc => {
-                oid::PBE_WITH_SHA_AND_40BIT_RC2_CBC_OID
-            }
-            EncryptionAlgorithm::PbeWithShaAnd3KeyTripleDesCbc => {
-                oid::PBE_WITH_SHA_AND3_KEY_TRIPLE_DES_CBC_OID
-            }
+            EncryptionAlgorithm::PbeWithShaAnd40BitRc4Cbc => oid::PBE_WITH_SHA_AND_40BIT_RC2_CBC_OID,
+            EncryptionAlgorithm::PbeWithShaAnd3KeyTripleDesCbc => oid::PBE_WITH_SHA_AND3_KEY_TRIPLE_DES_CBC_OID,
         }
     }
 }
@@ -349,14 +336,10 @@ impl Pkcs12Writer<'_, '_> {
     pub fn write(self) -> Result<Vec<u8>> {
         let mut cert_bags = Vec::new();
 
-        let certs = self
-            .keystore
-            .entries
-            .iter()
-            .filter_map(|(alias, entry)| match entry {
-                KeyStoreEntry::PrivateKeyChain(_) => None,
-                KeyStoreEntry::Certificate(cert) => Some((alias, cert)),
-            });
+        let certs = self.keystore.entries.iter().filter_map(|(alias, entry)| match entry {
+            KeyStoreEntry::PrivateKeyChain(_) => None,
+            KeyStoreEntry::Certificate(cert) => Some((alias, cert)),
+        });
 
         for (alias, cert) in certs {
             cert_bags.push(codec::certificate_to_safe_bag(cert, alias, None, true)?);
@@ -367,18 +350,16 @@ impl Pkcs12Writer<'_, '_> {
             .entries
             .iter()
             .filter_map(|(_, entry)| match entry {
-                KeyStoreEntry::PrivateKeyChain(chain) => {
-                    Some(chain.chain.iter().enumerate().map(|(i, c)| {
-                        (
-                            if i == 0 {
-                                Some(chain.local_key_id.as_slice())
-                            } else {
-                                None
-                            },
-                            c,
-                        )
-                    }))
-                }
+                KeyStoreEntry::PrivateKeyChain(chain) => Some(chain.chain.iter().enumerate().map(|(i, c)| {
+                    (
+                        if i == 0 {
+                            Some(chain.local_key_id.as_slice())
+                        } else {
+                            None
+                        },
+                        c,
+                    )
+                })),
                 KeyStoreEntry::Certificate(_) => None,
             })
             .flatten();
@@ -399,14 +380,10 @@ impl Pkcs12Writer<'_, '_> {
             self.password,
         )?;
 
-        let private_keys = self
-            .keystore
-            .entries
-            .iter()
-            .filter_map(|(alias, entry)| match entry {
-                KeyStoreEntry::PrivateKeyChain(chain) => Some((alias, chain)),
-                KeyStoreEntry::Certificate(_) => None,
-            });
+        let private_keys = self.keystore.entries.iter().filter_map(|(alias, entry)| match entry {
+            KeyStoreEntry::PrivateKeyChain(chain) => Some((alias, chain)),
+            KeyStoreEntry::Certificate(_) => None,
+        });
 
         let mut key_bags = Vec::new();
 

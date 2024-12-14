@@ -64,8 +64,7 @@ pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()>
                 mac_data.iterations as _,
                 Sha1::output_size(),
             )?;
-            let mut hmac =
-                hmac::Hmac::<Sha1>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
+            let mut hmac = hmac::Hmac::<Sha1>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
             hmac.update(data);
             hmac.verify_slice(mac_data.mac.digest.as_bytes())?;
             Ok(())
@@ -78,8 +77,7 @@ pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()>
                 mac_data.iterations as _,
                 Sha256::output_size(),
             )?;
-            let mut hmac =
-                hmac::Hmac::<Sha256>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
+            let mut hmac = hmac::Hmac::<Sha256>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
             hmac.update(data);
             hmac.verify_slice(mac_data.mac.digest.as_bytes())?;
             Ok(())
@@ -91,9 +89,7 @@ pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()>
 pub fn parse_auth_safe(safe: &ContentInfo, password: &str) -> Result<ParsedAuthSafe> {
     let data = match safe.content_type {
         oid::CONTENT_TYPE_DATA_OID => {
-            let os = OctetString::from_der(&safe.content.to_der()?)?
-                .as_bytes()
-                .to_vec();
+            let os = OctetString::from_der(&safe.content.to_der()?)?.as_bytes().to_vec();
             os
         }
         oid::CONTENT_TYPE_ENCRYPTED_DATA_OID => {
@@ -123,11 +119,7 @@ pub fn parse_auth_safe(safe: &ContentInfo, password: &str) -> Result<ParsedAuthS
 fn decrypt(alg: &AlgorithmIdentifierOwned, data: &[u8], password: &str) -> Result<Vec<u8>> {
     match alg.oid {
         oid::PBES2_OID => {
-            let params = alg
-                .parameters
-                .as_ref()
-                .ok_or(Error::InvalidParameters)?
-                .to_der()?;
+            let params = alg.parameters.as_ref().ok_or(Error::InvalidParameters)?.to_der()?;
 
             let params = pbes2::Parameters::from_der(&params)?;
 
@@ -137,11 +129,7 @@ fn decrypt(alg: &AlgorithmIdentifierOwned, data: &[u8], password: &str) -> Resul
         }
         #[cfg(feature = "pbes1")]
         oid::PBE_WITH_SHA_AND_40BIT_RC2_CBC_OID | oid::PBE_WITH_SHA_AND3_KEY_TRIPLE_DES_CBC_OID => {
-            let params = alg
-                .parameters
-                .as_ref()
-                .ok_or(Error::InvalidParameters)?
-                .to_der()?;
+            let params = alg.parameters.as_ref().ok_or(Error::InvalidParameters)?.to_der()?;
 
             let mut reader = SliceReader::new(&params)?;
             let (salt, iterations) = reader.sequence(|reader| {
@@ -181,24 +169,20 @@ fn encrypt(
             Ok((alg_id, encrypted))
         }
         #[cfg(feature = "pbes1")]
-        EncryptionAlgorithm::PbeWithShaAnd40BitRc4Cbc
-        | EncryptionAlgorithm::PbeWithShaAnd3KeyTripleDesCbc => {
+        EncryptionAlgorithm::PbeWithShaAnd40BitRc4Cbc | EncryptionAlgorithm::PbeWithShaAnd3KeyTripleDesCbc => {
             let salt: [u8; 20] = random();
-            let encrypted = Pbes1::new(alg.as_oid(), &salt, iterations, PbeMode::Encrypt)
-                .encrypt_decrypt(data, password)?;
+            let encrypted =
+                Pbes1::new(alg.as_oid(), &salt, iterations, PbeMode::Encrypt).encrypt_decrypt(data, password)?;
 
             let mut buf = vec![0u8; 64];
             let mut writer = SliceWriter::new(&mut buf);
             let salt = OctetStringRef::new(&salt)?;
 
-            writer.sequence(
-                (salt.encoded_len()? + iterations.encoded_len()?)?,
-                |writer| {
-                    salt.encode(writer)?;
-                    iterations.encode(writer)?;
-                    Ok(())
-                },
-            )?;
+            writer.sequence((salt.encoded_len()? + iterations.encoded_len()?)?, |writer| {
+                salt.encode(writer)?;
+                iterations.encode(writer)?;
+                Ok(())
+            })?;
             let params = writer.finish()?;
 
             let alg_id = AlgorithmIdentifierOwned {
@@ -231,11 +215,8 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
     let mut certs = Vec::new();
 
     for bag in bags {
-        let local_key_id = get_bag_attribute(&oid::LOCAL_KEY_ID_OID, &bag).and_then(|a| {
-            OctetString::from_der(&a)
-                .ok()
-                .map(|a| a.as_bytes().to_vec())
-        });
+        let local_key_id = get_bag_attribute(&oid::LOCAL_KEY_ID_OID, &bag)
+            .and_then(|a| OctetString::from_der(&a).ok().map(|a| a.as_bytes().to_vec()));
 
         let friendly_name = get_bag_attribute(&oid::FRIENDLY_NAME_OID, &bag)
             .and_then(|n| BmpString::from_der(&n).ok().map(|a| a.to_string()));
@@ -260,8 +241,7 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
                 });
             }
             oid::PKCS_12_PKCS8_KEY_BAG_OID => {
-                let cs: ContextSpecific<EncryptedPrivateKeyInfo> =
-                    ContextSpecific::from_der(&bag.bag_value)?;
+                let cs: ContextSpecific<EncryptedPrivateKeyInfo> = ContextSpecific::from_der(&bag.bag_value)?;
 
                 let decrypted = decrypt(
                     &cs.value.encryption_algorithm,
@@ -293,9 +273,8 @@ pub fn certificate_to_safe_bag(
 ) -> Result<SafeBag> {
     let mut bag_attributes = Attributes::new();
 
-    let friendly_name = SetOfVec::<AttributeValue>::from_iter([Any::from_der(
-        &BmpString::from_utf8(friendly_name)?.to_der()?,
-    )?])?;
+    let friendly_name =
+        SetOfVec::<AttributeValue>::from_iter([Any::from_der(&BmpString::from_utf8(friendly_name)?.to_der()?)?])?;
 
     bag_attributes.insert(Attribute {
         oid: oid::FRIENDLY_NAME_OID,
@@ -303,9 +282,8 @@ pub fn certificate_to_safe_bag(
     })?;
 
     if let Some(local_key_id) = local_key_id {
-        let local_key_id = SetOfVec::<AttributeValue>::from_iter([Any::from_der(
-            &OctetStringRef::new(local_key_id)?.to_der()?,
-        )?])?;
+        let local_key_id =
+            SetOfVec::<AttributeValue>::from_iter([Any::from_der(&OctetStringRef::new(local_key_id)?.to_der()?)?])?;
 
         bag_attributes.insert(Attribute {
             oid: oid::LOCAL_KEY_ID_OID,
@@ -314,9 +292,8 @@ pub fn certificate_to_safe_bag(
     }
 
     if trusted {
-        let key_usage = SetOfVec::<AttributeValue>::from_iter([Any::from_der(
-            &oid::ANY_EXTENDED_USAGE_OID.to_der()?,
-        )?])?;
+        let key_usage =
+            SetOfVec::<AttributeValue>::from_iter([Any::from_der(&oid::ANY_EXTENDED_USAGE_OID.to_der()?)?])?;
 
         bag_attributes.insert(Attribute {
             oid: oid::ORACLE_TRUSTED_KEY_USAGE_OID,
@@ -344,18 +321,16 @@ pub fn private_key_to_safe_bag(
 ) -> Result<SafeBag> {
     let mut bag_attributes = Attributes::new();
 
-    let friendly_name = SetOfVec::<AttributeValue>::from_iter([Any::from_der(
-        &BmpString::from_utf8(friendly_name)?.to_der()?,
-    )?])?;
+    let friendly_name =
+        SetOfVec::<AttributeValue>::from_iter([Any::from_der(&BmpString::from_utf8(friendly_name)?.to_der()?)?])?;
 
     bag_attributes.insert(Attribute {
         oid: oid::FRIENDLY_NAME_OID,
         values: friendly_name,
     })?;
 
-    let local_key_id = SetOfVec::<AttributeValue>::from_iter([Any::from_der(
-        &OctetStringRef::new(&key.local_key_id)?.to_der()?,
-    )?])?;
+    let local_key_id =
+        SetOfVec::<AttributeValue>::from_iter([Any::from_der(&OctetStringRef::new(&key.local_key_id)?.to_der()?)?])?;
 
     bag_attributes.insert(Attribute {
         oid: oid::LOCAL_KEY_ID_OID,
@@ -409,12 +384,7 @@ pub fn key_bags_to_auth_safe(bags: Vec<SafeBag>) -> Result<ContentInfo> {
     })
 }
 
-pub fn compute_mac(
-    data: &[u8],
-    algorithm: MacAlgorithm,
-    iterations: u64,
-    password: &str,
-) -> Result<MacData> {
+pub fn compute_mac(data: &[u8], algorithm: MacAlgorithm, iterations: u64, password: &str) -> Result<MacData> {
     let (oid, salt, digest) = match algorithm {
         MacAlgorithm::HmacSha1 => {
             let salt: [u8; 20] = random();
@@ -425,14 +395,9 @@ pub fn compute_mac(
                 iterations as _,
                 Sha1::output_size(),
             )?;
-            let mut hmac =
-                hmac::Hmac::<Sha1>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
+            let mut hmac = hmac::Hmac::<Sha1>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
             hmac.update(data);
-            (
-                oid::SHA1_OID,
-                salt.to_vec(),
-                hmac.finalize().into_bytes().to_vec(),
-            )
+            (oid::SHA1_OID, salt.to_vec(), hmac.finalize().into_bytes().to_vec())
         }
         MacAlgorithm::HmacSha256 => {
             let salt: [u8; 32] = random();
@@ -443,23 +408,15 @@ pub fn compute_mac(
                 iterations as _,
                 Sha256::output_size(),
             )?;
-            let mut hmac =
-                hmac::Hmac::<Sha256>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
+            let mut hmac = hmac::Hmac::<Sha256>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
             hmac.update(data);
-            (
-                oid::SHA256_OID,
-                salt.to_vec(),
-                hmac.finalize().into_bytes().to_vec(),
-            )
+            (oid::SHA256_OID, salt.to_vec(), hmac.finalize().into_bytes().to_vec())
         }
     };
 
     Ok(MacData {
         mac: DigestInfo {
-            algorithm: AlgorithmIdentifierOwned {
-                oid,
-                parameters: None,
-            },
+            algorithm: AlgorithmIdentifierOwned { oid, parameters: None },
             digest: OctetString::new(digest)?,
         },
         mac_salt: OctetString::new(salt)?,
