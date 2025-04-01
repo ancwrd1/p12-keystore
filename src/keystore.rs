@@ -191,8 +191,13 @@ impl KeyStore {
                     chain: vec![entry.cert.clone()],
                 };
 
+                let leaf_cert = &entry.cert;
+
                 while let Some(issuer) = find_issuer(&entry.cert.issuer) {
-                    key_chain.chain.push(issuer.cert.clone());
+                    // Avoid duplication of self-signed certs.
+                    if issuer.cert.subject != leaf_cert.subject {
+                        key_chain.chain.push(issuer.cert.clone());
+                    }
                     if issuer.cert.issuer == issuer.cert.subject {
                         break;
                     }
