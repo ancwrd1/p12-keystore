@@ -1,0 +1,7 @@
+# Open SSL extensions for signing the CSR
+
+[v3_leaf]
+basicConstraints = CA:FALSE
+subjectAltName   = DNS:localhost,IP:127.0.0.1
+keyUsage         = digitalSignature,keyAgreement
+extendedKeyUsage = serverAuth

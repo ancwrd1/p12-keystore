@@ -4,6 +4,7 @@ const PBES1_KEYSTORE: &[u8] = include_bytes!("../tests/assets/pbes1-keystore.p12
 const PBES2_KEYSTORE: &[u8] = include_bytes!("../tests/assets/pbes2-keystore.p12");
 const PBES1_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pbes1-truststore.p12");
 const PBES2_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pbes2-truststore.p12");
+const PFX_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pfx-ed25519.pfx");
 
 const PASSWORD: &str = "changeit";
 const ITERATIONS: u64 = 1000;
@@ -57,6 +58,19 @@ fn test_parse_pbes1_truststore() {
 #[test]
 fn test_parse_pbes2_truststore() {
     common_read_test(PBES2_TRUSTSTORE);
+}
+
+#[test]
+fn test_parse_self_signed_pfx() {
+    let keystore = KeyStore::from_pkcs12(PFX_TRUSTSTORE, PASSWORD).unwrap();
+
+    for e in keystore.entries() {
+        println!("{}: {:#?}", e.0, e.1)
+    }
+
+    let key_chain = keystore.private_key_chain().unwrap().1;
+
+    assert_eq!(1, key_chain.chain().len(), "self-signed certificates must not be duplicated");
 }
 
 #[test]
