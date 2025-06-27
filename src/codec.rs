@@ -125,7 +125,7 @@ fn decrypt(alg: &AlgorithmIdentifierOwned, data: &[u8], password: &str) -> Resul
 
             Ok(params
                 .decrypt(password.as_bytes(), data)
-                .map_err(|e| Error::Pkcs5Error(format!("{}", e)))?)
+                .map_err(|e| Error::Pkcs5Error(format!("{e}")))?)
         }
         #[cfg(feature = "pbes1")]
         oid::PBE_WITH_SHA_AND_40BIT_RC2_CBC_OID | oid::PBE_WITH_SHA_AND3_KEY_TRIPLE_DES_CBC_OID => {
@@ -159,7 +159,7 @@ fn encrypt(
 
             let encrypted = params
                 .encrypt(password.as_bytes(), data)
-                .map_err(|e| Error::Pkcs5Error(format!("{}", e)))?;
+                .map_err(|e| Error::Pkcs5Error(format!("{e}")))?;
 
             let alg_id = AlgorithmIdentifierOwned {
                 oid: alg.as_oid(),
