@@ -6,6 +6,7 @@ use std::{
 use cms::content_info::ContentInfo;
 use der::oid::ObjectIdentifier;
 use der::{asn1::OctetString, Any, Decode, Encode};
+use hex::ToHex;
 use pkcs12::{
     authenticated_safe::AuthenticatedSafe,
     pfx::{Pfx, Version},
@@ -108,12 +109,29 @@ impl fmt::Debug for PrivateKeyChain {
             .finish()
     }
 }
+#[derive(Clone, PartialEq, Eq)]
+pub struct Secret {
+    pub(crate) algorithm_oid: String,
+    pub(crate) key: Vec<u8>,
+    pub(crate) local_key_id: Vec<u8>,
+}
+
+impl fmt::Debug for Secret {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PrivateKeyChain")
+            .field("algorithm_oid", &self.algorithm_oid)
+            .field("key", &"<KEY>")
+            .field("local_key_id", &hex::encode(&self.local_key_id))
+            .finish()
+    }
+}
 
 /// KeyStoreEntry represents one entry in the keystore
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeyStoreEntry {
     PrivateKeyChain(PrivateKeyChain),
     Certificate(Certificate),
+    Secret(Secret),
 }
 
 /// Keystore entries iterator
@@ -163,11 +181,17 @@ impl KeyStore {
 
         let mut parsed_keys = Vec::new();
         let mut parsed_certs = Vec::new();
+        let mut parsed_secrets = Vec::new();
 
         for safe in safes.into_iter() {
-            let ParsedAuthSafe { keys, certs } = codec::parse_auth_safe(&safe, password)?;
+            let ParsedAuthSafe {
+                keys: keys,
+                certs,
+                secrets,
+            } = codec::parse_auth_safe(&safe, password)?;
             parsed_keys.extend(keys);
             parsed_certs.extend(certs);
+            parsed_secrets.extend(secrets);
         }
 
         let find_cert_by_key = |key: &[u8]| {
@@ -212,6 +236,14 @@ impl KeyStore {
                 let alias = cert.friendly_name.clone().unwrap_or_else(|| cert.cert.subject.clone());
                 keystore.add_entry(&alias, KeyStoreEntry::Certificate(cert.cert));
             }
+        }
+
+        for secret in parsed_secrets {
+            let alias = secret
+                .friendly_name
+                .clone()
+                .unwrap_or_else(|| secret.key.local_key_id.encode_hex());
+            keystore.add_entry(&alias, KeyStoreEntry::Secret(secret.key));
         }
 
         Ok(keystore)
@@ -271,6 +303,7 @@ impl KeyStore {
         self.entries().find_map(|(alias, entry)| match entry {
             KeyStoreEntry::PrivateKeyChain(chain) => Some((alias.as_str(), chain)),
             KeyStoreEntry::Certificate(_) => None,
+            KeyStoreEntry::Secret(_) => None,
         })
     }
 }
@@ -344,6 +377,7 @@ impl Pkcs12Writer<'_, '_> {
         let certs = self.keystore.entries.iter().filter_map(|(alias, entry)| match entry {
             KeyStoreEntry::PrivateKeyChain(_) => None,
             KeyStoreEntry::Certificate(cert) => Some((alias, cert)),
+            KeyStoreEntry::Secret(_) => None,
         });
 
         for (alias, cert) in certs {
@@ -366,6 +400,7 @@ impl Pkcs12Writer<'_, '_> {
                     )
                 })),
                 KeyStoreEntry::Certificate(_) => None,
+                KeyStoreEntry::Secret(_) => None,
             })
             .flatten();
 
@@ -388,6 +423,7 @@ impl Pkcs12Writer<'_, '_> {
         let private_keys = self.keystore.entries.iter().filter_map(|(alias, entry)| match entry {
             KeyStoreEntry::PrivateKeyChain(chain) => Some((alias, chain)),
             KeyStoreEntry::Certificate(_) => None,
+            KeyStoreEntry::Secret(_) => None,
         });
 
         let mut key_bags = Vec::new();

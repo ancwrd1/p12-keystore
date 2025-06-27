@@ -16,3 +16,7 @@ pub const SHA256_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.16.840.
 pub const CERT_TYPE_X509_CERTIFICATE_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.9.22.1");
 pub const PKCS_12_PKCS8_KEY_BAG_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.12.10.1.2");
 pub const PKCS_12_CERT_BAG_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.12.10.1.3");
+pub const PKCS_12_SECRET_BAG_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.12.10.1.5");
+pub const AES_KEY_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.1");
+pub const BLOWFISH_KEY_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.3029.1.1.2");
+pub const HMAC_KEY_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.2.11");

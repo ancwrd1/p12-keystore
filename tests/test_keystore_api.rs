@@ -2,6 +2,9 @@ use p12_keystore::{KeyStore, KeyStoreEntry};
 
 const PBES1_KEYSTORE: &[u8] = include_bytes!("../tests/assets/pbes1-keystore.p12");
 const PBES1_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pbes1-truststore.p12");
+
+const PBES2_KEYSTORE_AES_KEY: &[u8] = include_bytes!("../tests/assets/pbes2-keystore-aes-key.p12");
+
 const PASSWORD: &str = "changeit";
 
 #[test]
@@ -64,4 +67,17 @@ fn test_keystore_api() {
     assert!(matches!(reloaded.entry("e2"), Some(KeyStoreEntry::PrivateKeyChain(_))));
 
     assert_ne!(new_store.entry("e1"), new_store.entry("e2"));
+}
+
+#[test]
+fn test_keystore_api_with_aes_key() {
+    let keystore_with_ase_key = KeyStore::from_pkcs12(PBES2_KEYSTORE_AES_KEY, PASSWORD);
+
+    assert!(&keystore_with_ase_key.is_ok());
+
+    let keystore_with_ase_key = keystore_with_ase_key.unwrap();
+    let entries = keystore_with_ase_key.entries();
+    assert!(8usize == keystore_with_ase_key.entries_count());
+
+    entries.for_each(|(i, e)| println!("\"{}\" => {:?}", i, e));
 }

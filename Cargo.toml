@@ -15,17 +15,20 @@ default = ["pbes1"]
 pbes1 = ["dep:cbc", "dep:rc2", "dep:des"]
 
 [dependencies]
-pkcs5 = { version = "0.7", features = ["alloc", "pbes2"]}
-pkcs12 = {  version = "0.1", features = ["kdf"] }
+pkcs5 = { version = "0.7", features = ["alloc", "pbes2"] }
+pkcs12 = { version = "0.1", features = ["kdf"] }
 cms = "0.2"
-der = { version = "0.7", features = ["std"] }
+der = { version = "0.7", features = ["std", "derive"] }
 thiserror = "2"
 cbc = { version = "0.1", features = ["block-padding", "alloc"], optional = true }
 rc2 = { version = "0.8", optional = true }
-des = {  version = "0.8", optional = true }
+des = { version = "0.8", optional = true }
 sha1 = "0.10"
 sha2 = "0.10"
 x509-parser = "0.17"
 hex = "0.4"
 hmac = "0.12"
 rand = "0.9"
+base64 = "0.22.1"
+pkcs8 = { version = "0.10.2", features = ["pkcs5", "getrandom", "encryption"] }
+log = "0.4.27"

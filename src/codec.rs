@@ -1,3 +1,7 @@
+use der::asn1::ContextSpecific;
+use der::{EncodeValue, Sequence, Tagged};
+
+use base64::Engine;
 use cms::{
     cert::{
         x509::attr::{Attribute, AttributeValue, Attributes},
@@ -7,11 +11,19 @@ use cms::{
     encrypted_data::EncryptedData,
     enveloped_data::EncryptedContentInfo,
 };
+
+use crate::keystore::Secret;
+use crate::{
+    error::Error,
+    keystore::{Certificate, EncryptionAlgorithm, MacAlgorithm, PrivateKeyChain},
+    oid, Result,
+};
 use der::{
-    asn1::{BmpString, ContextSpecific, ObjectIdentifier, OctetString, OctetStringRef, SetOfVec},
+    asn1::{BmpString, ObjectIdentifier, OctetString, OctetStringRef, SetOfVec},
     Any, Decode, Encode,
 };
 use hmac::{digest::Digest, Mac};
+use pkcs12::safe_bag::PrivateKeyInfo;
 use pkcs12::{
     cert_type::CertBag,
     digest_info::DigestInfo,
@@ -31,15 +43,14 @@ use {
     der::{Reader, SliceReader, SliceWriter},
 };
 
-use crate::{
-    error::Error,
-    keystore::{Certificate, EncryptionAlgorithm, MacAlgorithm, PrivateKeyChain},
-    oid, Result,
-};
-
 pub struct ParsedKeyChain {
     pub friendly_name: Option<String>,
     pub key: PrivateKeyChain,
+}
+
+pub struct ParsedSecret {
+    pub friendly_name: Option<String>,
+    pub key: Secret,
 }
 
 pub struct ParsedCertificate {
@@ -52,6 +63,7 @@ pub struct ParsedCertificate {
 pub struct ParsedAuthSafe {
     pub keys: Vec<ParsedKeyChain>,
     pub certs: Vec<ParsedCertificate>,
+    pub secrets: Vec<ParsedSecret>,
 }
 
 pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()> {
@@ -213,6 +225,7 @@ fn get_bag_attribute(oid: &ObjectIdentifier, bag: &SafeBag) -> Option<Vec<u8>> {
 fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
     let mut keys = Vec::new();
     let mut certs = Vec::new();
+    let mut secrets = Vec::new();
 
     for bag in bags {
         let local_key_id = get_bag_attribute(&oid::LOCAL_KEY_ID_OID, &bag)
@@ -258,11 +271,33 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
                     keys.push(ParsedKeyChain { friendly_name, key });
                 }
             }
+            oid::PKCS_12_SECRET_BAG_OID => {
+                if let Ok(enc_key) = EncryptedPrivateKeyInfo::from_der(&bag.bag_value[25..]) {
+                    if let Ok(plain) = decrypt(
+                        &enc_key.encryption_algorithm,
+                        enc_key.encrypted_data.as_bytes(),
+                        password,
+                    ) {
+                        if let Ok(priv_key) = PrivateKeyInfo::from_der(&plain) {
+                            //println!("{:?}", priv_key);
+                            let algorithm_oid = priv_key.algorithm.oid.to_string();
+                            if let Some(local_key_id) = local_key_id {
+                                let key = Secret {
+                                    algorithm_oid,
+                                    key: priv_key.private_key.into_bytes(),
+                                    local_key_id,
+                                };
+                                secrets.push(ParsedSecret { friendly_name, key });
+                            }
+                        }
+                    }
+                }
+            }
             _ => {}
         }
     }
 
-    Ok(ParsedAuthSafe { keys, certs })
+    Ok(ParsedAuthSafe { keys, certs, secrets })
 }
 
 pub fn certificate_to_safe_bag(
@@ -423,3 +458,6 @@ pub fn compute_mac(data: &[u8], algorithm: MacAlgorithm, iterations: u64, passwo
         iterations: iterations as _,
     })
 }
+
+#[cfg(test)]
+mod tests {}
