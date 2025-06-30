@@ -3,6 +3,9 @@ use std::{
     fmt,
 };
 
+use crate::codec::{secret_to_safe_bag, ParsedAuthSafe};
+use crate::secret::Secret;
+use crate::{codec, error::Error, oid, Result};
 use cms::content_info::ContentInfo;
 use der::oid::ObjectIdentifier;
 use der::{asn1::OctetString, Any, Decode, Encode};
@@ -11,10 +14,6 @@ use pkcs12::{
     authenticated_safe::AuthenticatedSafe,
     pfx::{Pfx, Version},
 };
-
-use crate::codec::ParsedAuthSafe;
-use crate::secret::Secret;
-use crate::{codec, error::Error, oid, Result};
 
 /// X.509 certificate wrapper
 #[derive(Clone, PartialEq, Eq)]
@@ -420,11 +419,38 @@ impl Pkcs12Writer<'_, '_> {
 
         let keys_safe = codec::key_bags_to_auth_safe(key_bags)?;
 
-        let safes = OctetString::new(vec![certs_safe, keys_safe].to_der()?)?;
+        //let safes = OctetString::new(vec![certs_safe, keys_safe].to_der()?)?;
+        let mut safes = vec![certs_safe, keys_safe];
 
+        let secrets = self
+            .keystore
+            .entries
+            .iter()
+            .filter_map(|(a, entry)| match entry {
+                KeyStoreEntry::PrivateKeyChain(_) => None,
+                KeyStoreEntry::Certificate(_) => None,
+                KeyStoreEntry::Secret(s) => {
+                    let bag = secret_to_safe_bag(
+                        s,
+                        self.encryption_algorithm,
+                        a,
+                        self.encryption_iterations,
+                        self.password,
+                    );
+                    Some(bag)
+                }
+            })
+            .flatten();
+
+        for i in secrets {
+            //TODO: make it to content info
+            safes.push(codec::key_bags_to_auth_safe(vec![i])?)
+        }
+
+        let safe_bags = OctetString::new(safes.to_der()?)?;
         let auth_safe = ContentInfo {
             content_type: oid::CONTENT_TYPE_DATA_OID,
-            content: Any::from_der(&safes.to_der()?)?,
+            content: Any::from_der(&safe_bags.to_der()?)?,
         };
 
         let mac_data = codec::compute_mac(

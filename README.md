@@ -9,7 +9,7 @@
 ## Overview
 
 This project contains a simple to use high-level library to work with PKCS#12/PFX keystores, written in pure Rust,
- modeled after Java KeyStore API.
+modeled after Java KeyStore API.
 
 Features:
 
@@ -17,6 +17,7 @@ Features:
 * Support for 'truststores' with only CA root certificates
 * Modern and legacy encryption schemes
 * Able to read and write Java-compatible keystores
+* Support for secret keys and generation of secret keys
 
 Limitations:
 
@@ -28,4 +29,5 @@ Limitations:
 
 ## License
 
-Licensed under MIT or Apache license ([LICENSE-MIT](https://opensource.org/licenses/MIT) or [LICENSE-APACHE](https://opensource.org/licenses/Apache-2.0))
+Licensed under MIT or Apache license ([LICENSE-MIT](https://opensource.org/licenses/MIT)
+or [LICENSE-APACHE](https://opensource.org/licenses/Apache-2.0))

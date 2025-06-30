@@ -1,3 +1,6 @@
+use base64::prelude::BASE64_STANDARD;
+use base64::Engine;
+use p12_keystore::secret::{Secret, SecretKeyType};
 use p12_keystore::{KeyStore, KeyStoreEntry};
 
 const PBES1_KEYSTORE: &[u8] = include_bytes!("../tests/assets/pbes1-keystore.p12");
@@ -80,4 +83,31 @@ fn test_keystore_api_with_aes_key() {
     // assert!(8usize == keystore_with_ase_key.entries_count());
 
     entries.for_each(|(i, e)| println!("\"{}\" => {:?}", i, e));
+}
+
+#[test]
+fn test_keystore_read_write_copy() {
+    let keystore_with_keys = KeyStore::from_pkcs12(PBES2_KEYSTORE_AES_KEY, PASSWORD);
+
+    assert!(&keystore_with_keys.is_ok());
+
+    if let Ok(keystore_with_keys) = keystore_with_keys {
+        let store_data = keystore_with_keys.writer("welcome1").write().unwrap();
+        std::fs::write(format!("test_dummy.p12"), &store_data).unwrap();
+        println!("{:?}", BASE64_STANDARD.encode(&store_data));
+        let keystore_with_keys_copy = KeyStore::from_pkcs12(&store_data, "welcome1").unwrap();
+        assert_eq!(13, keystore_with_keys_copy.entries_count());
+    }
+}
+
+#[test]
+fn test_keystore_create() {
+    let mut keystore = KeyStore::new();
+    let secret = Secret::builder(SecretKeyType::AES).with_lenght(24).build().unwrap();
+    keystore.add_entry("test", KeyStoreEntry::Secret(secret));
+    let store_data = keystore.writer("welcome1").write().unwrap();
+    std::fs::write(format!("test_single_key.p12"), &store_data).unwrap();
+    println!("{:?}", BASE64_STANDARD.encode(&store_data));
+    let keystore_with_keys_copy = KeyStore::from_pkcs12(&store_data, "welcome1").unwrap();
+    assert_eq!(1, keystore_with_keys_copy.entries_count());
 }

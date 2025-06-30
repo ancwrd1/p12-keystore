@@ -23,7 +23,7 @@ use der::{
     Any, Decode, Encode,
 };
 use hmac::{digest::Digest, Mac};
-use pkcs12::safe_bag::PrivateKeyInfo;
+use pkcs12::safe_bag::{Pkcs8Version, PrivateKeyInfo};
 use pkcs12::{
     cert_type::CertBag,
     digest_info::DigestInfo,
@@ -37,6 +37,7 @@ use rand::random;
 use sha1::Sha1;
 use sha2::Sha256;
 
+use crate::oid::PKCS_12_PKCS8_KEY_BAG_OID;
 use crate::secret::{Secret, SecretKeyType};
 #[cfg(feature = "pbes1")]
 use {
@@ -344,15 +345,17 @@ pub fn certificate_to_safe_bag(
 
 #[derive(Debug, PartialEq, Eq, Clone, Sequence)]
 pub struct SecretBag {
-    pub algorithm_identifier: ObjectIdentifier,
+    pub object_identifier: ObjectIdentifier,
     #[asn1(context_specific = "0")]
-    pub priv_key_info: OctetString,
+    pub encrypted_priv_key_info: OctetString,
     pub bag_attributes: Option<Attributes>,
 }
 
 impl SecretBag {
     pub fn private_key_info(&self, passwd: &str) -> crate::Result<PrivateKeyInfo> {
-        if let Ok(enc_key) = pkcs12::pbe_params::EncryptedPrivateKeyInfo::from_der(&self.priv_key_info.as_bytes()) {
+        if let Ok(enc_key) =
+            pkcs12::pbe_params::EncryptedPrivateKeyInfo::from_der(&self.encrypted_priv_key_info.as_bytes())
+        {
             if let Ok(plain) =
                 crate::codec::decrypt(&enc_key.encryption_algorithm, enc_key.encrypted_data.as_bytes(), passwd)
             {
@@ -364,6 +367,39 @@ impl SecretBag {
         }
         Err(crate::error::Error::UnsupportedEncryptionScheme)
     }
+    /*
+       pub fn from_secret_key(key: &Secret, password: &str) -> crate::Result<SecretBag> {
+
+           /*
+
+            */
+
+           // ObjectIdentifier(1.2.840.113549.1.12.10.1.2)
+           /*let private_key_info = PrivateKeyInfo {
+               version: Pkcs8Version::V0,
+               algorithm: AlgorithmIdentifier {},
+               private_key: OctetString::
+               attributes: None,
+           }
+
+            */
+
+           let enc_priv_key_info = EncryptedPrivateKeyInfo {
+               encryption_algorithm: AlgorithmIdentifier {},
+               encrypted_data: (),
+           }
+           /*
+           let secret_bag = SecretBag {
+               object_identifier: PKCS8_SHROUDED_KEY_BAG_OID,
+               priv_key_info: ,
+               bag_attributes: None,
+           }
+
+            */
+           Err(crate::error::Error::UnsupportedEncryptionScheme)
+       }
+
+    */
 
     pub fn from_bag_der(data: &[u8]) -> crate::Result<SecretBag> {
         let envelop = Any::from_der(data);
@@ -379,6 +415,68 @@ impl SecretBag {
             Err(e) => Err(crate::error::Error::DerError(e)),
         }
     }
+}
+
+pub fn secret_to_safe_bag(
+    key: &Secret,
+    algorithm: EncryptionAlgorithm,
+    friendly_name: &str,
+    iterations: u64,
+    password: &str,
+) -> Result<SafeBag> {
+    let mut bag_attributes = Attributes::new();
+    let friendly_name =
+        SetOfVec::<AttributeValue>::from_iter([Any::from_der(&BmpString::from_utf8(friendly_name)?.to_der()?)?])?;
+
+    bag_attributes.insert(Attribute {
+        oid: oid::FRIENDLY_NAME_OID,
+        values: friendly_name,
+    })?;
+
+    let local_key_id =
+        SetOfVec::<AttributeValue>::from_iter([Any::from_der(&OctetStringRef::new(&key.local_key_id)?.to_der()?)?])?;
+
+    bag_attributes.insert(Attribute {
+        oid: oid::LOCAL_KEY_ID_OID,
+        values: local_key_id,
+    })?;
+
+    let key_algorithm_identifier = AlgorithmIdentifierOwned {
+        oid: key.key_type.to_oid(),
+        parameters: None,
+    };
+
+    let key_info = PrivateKeyInfo {
+        version: Pkcs8Version::V0,
+        algorithm: key_algorithm_identifier,
+        private_key: OctetString::new(&*key.key)?,
+        attributes: None,
+    };
+
+    let key_info_der = key_info.to_der()?;
+
+    let (alg_id, encrypted) = encrypt(algorithm, iterations, &key_info_der, password)?;
+
+    let ecnrypted_key_info = EncryptedPrivateKeyInfo {
+        encryption_algorithm: alg_id,
+        encrypted_data: OctetString::new(encrypted)?,
+    };
+
+    let encrypted_key_info_os = OctetString::new(ecnrypted_key_info.to_der()?)?;
+
+    let secret_bag = SecretBag {
+        object_identifier: PKCS_12_PKCS8_KEY_BAG_OID,
+        encrypted_priv_key_info: encrypted_key_info_os,
+        bag_attributes: None,
+    };
+
+    let any = Any::from_der(&secret_bag.to_der()?)?;
+
+    Ok(SafeBag {
+        bag_id: oid::PKCS_12_SECRET_BAG_OID,
+        bag_value: any.to_der()?,
+        bag_attributes: Some(bag_attributes),
+    })
 }
 
 pub fn private_key_to_safe_bag(
@@ -495,10 +593,14 @@ pub fn compute_mac(data: &[u8], algorithm: MacAlgorithm, iterations: u64, passwo
 
 #[cfg(test)]
 mod tests {
-    use crate::codec::SecretBag;
+    use crate::codec::{secret_to_safe_bag, SecretBag};
+    use crate::secret::Secret;
+    use crate::secret::SecretKeyType::AES;
+    use crate::EncryptionAlgorithm;
     use base64::engine::general_purpose::STANDARD;
     use base64::Engine;
-    use der::{Any, Decode, Reader};
+    use der::{Any, Decode, Encode};
+    use pkcs12::safe_bag::SafeBag;
     use pkcs8::EncryptedPrivateKeyInfo;
 
     // Testdata for writing the full SecretBag struct
@@ -517,7 +619,7 @@ mod tests {
             Err(e) => panic!("{}", e),
             Ok(bag) => {
                 println!("{:#?}", bag);
-                let inner = bag.priv_key_info.as_bytes();
+                let inner = bag.encrypted_priv_key_info.as_bytes();
                 let alg_ident = EncryptedPrivateKeyInfo::from_der(&inner).unwrap();
                 println!("{:#?}", alg_ident);
                 let priv_key = bag.private_key_info("changeit");
@@ -531,5 +633,34 @@ mod tests {
         let der = STANDARD.decode(SECRET_BAG_DATA).unwrap();
         let secret = SecretBag::from_bag_der(der.as_slice());
         assert!(secret.is_ok());
+        if let Ok(secret) = secret {
+            println!("{:#?}", secret);
+            let priv_key = secret.private_key_info("changeit");
+            println!("{:#?}", priv_key);
+        }
+    }
+
+    #[test]
+    fn test_secret_to_safe_bag() {
+        let secret = Secret::builder(AES).with_lenght(32).build().unwrap();
+        let bag = secret_to_safe_bag(
+            &secret,
+            EncryptionAlgorithm::PbeWithHmacSha256AndAes256,
+            "myKey",
+            10000,
+            "changeit",
+        )
+        .unwrap();
+        println!("{:#?}", bag);
+        let der = bag.to_der().unwrap();
+
+        let safe_bag = SafeBag::from_der(&der).unwrap();
+        let bag = SecretBag::from_bag_der(&*safe_bag.bag_value).unwrap();
+
+        let priv_key = bag.private_key_info("changeit").unwrap();
+
+        let priv_key_value = priv_key.private_key.into_bytes();
+        assert_eq!(secret.get_key(), priv_key_value);
+        assert_eq!(secret.get_key_len(), priv_key_value.len());
     }
 }

@@ -29,7 +29,7 @@ mod keystore;
 mod oid;
 #[cfg(feature = "pbes1")]
 mod pbes1;
-mod secret;
+pub mod secret;
 
 /// Result type for keystore operations
 pub type Result<T> = std::result::Result<T, error::Error>;

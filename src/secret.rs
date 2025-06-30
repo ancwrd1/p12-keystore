@@ -313,7 +313,7 @@ mod tests {
         let initial_key_type = SecretKeyType::AES128Cbc;
         let initial_local_key_id = vec![10, 20, 30];
 
-        let mut secret = Secret {
+        let secret = Secret {
             key: initial_key.clone(),
             key_type: initial_key_type,
             local_key_id: initial_local_key_id.clone(),
