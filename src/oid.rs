@@ -17,7 +17,6 @@ pub const CERT_TYPE_X509_CERTIFICATE_OID: ObjectIdentifier = ObjectIdentifier::n
 pub const PKCS_12_PKCS8_KEY_BAG_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.12.10.1.2");
 pub const PKCS_12_CERT_BAG_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.12.10.1.3");
 pub const PKCS_12_SECRET_BAG_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.12.10.1.5");
-//pub const PKCS8_SHROUDED_KEY_BAG_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.12.10.1.2");
 pub const AES_GROUP_KEY_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.1");
 pub const AES_128_CBC_KEY_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.1.2");
 pub const AES_192_CBC_KEY_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.16.840.1.101.3.4.1.22");

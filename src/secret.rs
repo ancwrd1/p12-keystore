@@ -10,6 +10,7 @@ use rand::TryRngCore;
 use std::fmt;
 use std::time::{Duration, UNIX_EPOCH};
 
+/// Holds a secret key of a given type.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Secret {
     pub(crate) key_type: SecretKeyType,
@@ -17,29 +18,62 @@ pub struct Secret {
     pub(crate) local_key_id: Vec<u8>,
 }
 
+/// Implementation of the `Secret` methods.
 impl Secret {
-    /// Get private key data
+    /// Get key data
     pub fn get_key(&self) -> &[u8] {
         &self.key
     }
 
+    /// Get the key type
     pub fn get_key_type(&self) -> SecretKeyType {
         self.key_type
     }
 
+    /// gets the local_key_id as bytes
     pub fn get_local_key_id(&self) -> Vec<u8> {
         self.local_key_id.clone()
     }
 
+    /// The builder to build a secret of a given type. If the type has no length assigned,
+    /// it needs also a .with_length(<bytes>).
+    /// # Example:
+    /// ```
+    /// use p12_keystore::secret::Secret;
+    /// use p12_keystore::secret::SecretKeyType::AES;
+    /// let secret = Secret::builder(AES).with_length(24).build();
+    /// ```
+    ///
     pub fn builder(key_type: SecretKeyType) -> SecretBuilder {
         SecretBuilder::new(key_type)
     }
 
+    /// returns the key length in bytes
     pub fn get_key_len(&self) -> usize {
         self.key.len()
     }
 }
 
+/// The builder for secrets. It starts with a secret type. If the key type has a length associated,
+/// then you do not need to set the length. You can overwrite the `local_key_id` and the `key` itself.
+///
+/// # Examples:
+/// ```
+/// use p12_keystore::secret::Secret;
+/// use p12_keystore::secret::SecretKeyType::{AES256Cbc, AES};
+///
+/// // creates a generic AES secret with any length (128,192,256 bits)
+/// let secret_aes = Secret::builder(AES).with_length(24).build();
+/// let secret_aes_256 = Secret::builder(AES256Cbc).build();
+///
+/// // build with a given local_key_id
+/// let local_key_id = vec![4,7,1,1];
+/// let secret_aes = Secret::builder(AES).with_length(32).with_local_key_id(local_key_id).build();
+///
+/// // build with a given key
+/// let key = [0u8,16];
+/// let secret_aes = Secret::builder(AES).with_key(Vec::from(key)).build();
+/// ```
 pub struct SecretBuilder {
     key_type: SecretKeyType,
     key: Option<Vec<u8>>,
@@ -47,7 +81,10 @@ pub struct SecretBuilder {
     key_len: Option<usize>,
 }
 
+/// Implementation for the SecretBuilder methods
 impl SecretBuilder {
+    /// Creates a new SecretBuilder with a given key type. If SecretKeyType has a length assigned,
+    /// there is no need to set the key length
     pub fn new(key_type: SecretKeyType) -> Self {
         let key_len = key_type.default_len();
         SecretBuilder {
@@ -58,22 +95,27 @@ impl SecretBuilder {
         }
     }
 
-    pub fn with_lenght(&mut self, len: usize) -> &mut Self {
+    /// Provides the key length in byes. This is only required if you do not use a SecretKeyType
+    /// with a length assigned, or you do not provide a key value.
+    pub fn with_length(&mut self, len: usize) -> &mut Self {
         self.key_len = Some(len);
         self
     }
 
+    /// Preloads the key, if omitted, it will be generated using OsRng
     pub fn with_key(&mut self, key: Vec<u8>) -> &mut Self {
         self.key_len = Some(key.len());
         self.key = Some(key);
         self
     }
 
+    /// Predefines the local_key_id. If omitted, it is generated based on timestamp and random.
     pub fn with_local_key_id(&mut self, local_key_id: Vec<u8>) -> &mut Self {
         self.local_key_id = Some(local_key_id);
         self
     }
 
+    /// builds the secret
     pub fn build(&mut self) -> Result<Secret, SecretKeyBuilderError> {
         if self.local_key_id.is_none() {
             let key_id_rng = OsRng.try_next_u32();
@@ -99,20 +141,27 @@ impl SecretBuilder {
             }
         }
 
-        Ok(Secret {
-            key_type: self.key_type,
-            key: self.key.clone().unwrap(),
-            local_key_id: self.local_key_id.clone().unwrap(),
-        })
+        if let (Some(key), Some(local_key_id)) = (&self.key, &self.local_key_id) {
+            Ok(Secret {
+                key_type: self.key_type,
+                key: key.clone(),
+                local_key_id: local_key_id.clone(),
+            })
+        } else {
+            Err(SecretKeyBuilderError::MissingKeyOrLocalKeyId)
+        }
     }
 }
 
+/// Error, which can be returned by the `SecretBuilder`
 #[derive(Debug, PartialEq)]
 pub enum SecretKeyBuilderError {
     MissingKeyLength,
+    MissingKeyOrLocalKeyId,
     RandomGenerationError(OsError),
 }
 
+/// Available types of secrets. If the type is unknown, use `Unknown(<oid>)`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SecretKeyType {
     AES,
@@ -133,7 +182,10 @@ pub enum SecretKeyType {
     Unknown(ObjectIdentifier),
 }
 
+/// Implements important conversions for `SecretKeyType`
+///
 impl SecretKeyType {
+    /// Builds a `SecretKeyType` from an `ObjectIdentifier`
     pub fn from_oid(oid: &ObjectIdentifier) -> Self {
         match *oid {
             o if o == AES_GROUP_KEY_OID => SecretKeyType::AES,
@@ -155,6 +207,7 @@ impl SecretKeyType {
         }
     }
 
+    /// Return the `ObjectIdentifier` for a `SecretKeyType`
     pub fn to_oid(&self) -> ObjectIdentifier {
         match self {
             SecretKeyType::AES => AES_GROUP_KEY_OID,
@@ -179,20 +232,22 @@ impl SecretKeyType {
     /// returns default key length in bytes
     pub(crate) fn default_len(&self) -> Option<usize> {
         match self {
-            SecretKeyType::AES128Cbc => Some(16),
-            SecretKeyType::AES192Cbc => Some(192 / 8),
-            SecretKeyType::AES256Cbc => Some(256 / 8),
-            SecretKeyType::HmacSha1 | SecretKeyType::HmacSha224 => Some(512 / 8),
-            SecretKeyType::HmacSha256 | SecretKeyType::HmacSha384 | SecretKeyType::HmacSha512 => Some(1024 / 8),
+            SecretKeyType::AES128Cbc => Some(16),                            // 128 bit
+            SecretKeyType::AES192Cbc => Some(24),                            // 196 bit
+            SecretKeyType::AES256Cbc => Some(32),                            // 256 bit
+            SecretKeyType::HmacSha1 | SecretKeyType::HmacSha224 => Some(64), // 512 bit
+            SecretKeyType::HmacSha256 | SecretKeyType::HmacSha384 | SecretKeyType::HmacSha512 => Some(128), // 1024 bit
             _ => None,
         }
     }
 
+    /// Builds a `SecretKeyType` from an OID String
     pub fn from_oid_str(oid_str: &str) -> Self {
         SecretKeyType::from_oid(&ObjectIdentifier::new_unwrap(oid_str))
     }
 }
 
+/// Implements debug for formatted output
 impl fmt::Debug for Secret {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PrivateKeyChain")
@@ -307,8 +362,7 @@ mod tests {
     }
 
     #[test]
-    fn test_getters_and_setters() {
-        // Setup initial values
+    fn test_getters() {
         let initial_key = vec![1, 2, 3];
         let initial_key_type = SecretKeyType::AES128Cbc;
         let initial_local_key_id = vec![10, 20, 30];
@@ -337,7 +391,7 @@ mod tests {
 
     #[test]
     fn test_secret_builder_with_aes128_generic() {
-        let secret = Secret::builder(SecretKeyType::AES).with_lenght(16).build();
+        let secret = Secret::builder(SecretKeyType::AES).with_length(16).build();
         assert!(secret.is_ok());
         if let Ok(secret) = secret {
             assert_eq!(secret.get_key_type(), SecretKeyType::AES);
@@ -366,7 +420,7 @@ mod tests {
 
     #[test]
     fn test_secret_builder_with_val() {
-        let key_val = vec![[17u8; 32]].as_flattened().to_vec();
+        let key_val = [[17u8; 32]].as_flattened().to_vec();
         let secret = Secret::builder(SecretKeyType::AES).with_key(key_val.clone()).build();
         assert!(secret.is_ok());
         if let Ok(secret) = secret {
@@ -378,8 +432,8 @@ mod tests {
 
     #[test]
     fn test_secret_builder_with_val_n_id() {
-        let key_val = vec![[17u8; 32]].as_flattened().to_vec();
-        let key_id_val = vec![[0u8; 20]].as_flattened().to_vec();
+        let key_val = [[17u8; 32]].as_flattened().to_vec();
+        let key_id_val = [[0u8; 20]].as_flattened().to_vec();
         let secret = Secret::builder(SecretKeyType::AES256Cbc)
             .with_key(key_val.clone())
             .with_local_key_id(key_id_val.clone())

@@ -25,7 +25,7 @@ pub struct Certificate {
 
 impl Certificate {
     /// Create certificate from DER encoding
-    pub fn from_der(der: &[u8]) -> crate::Result<Self> {
+    pub fn from_der(der: &[u8]) -> Result<Self> {
         let (_, cert) = x509_parser::parse_x509_certificate(der)?;
         Ok(Self {
             data: der.to_vec(),
@@ -69,7 +69,7 @@ pub struct PrivateKeyChain {
 }
 
 impl PrivateKeyChain {
-    /// Create new keychain with a given key data, key id and a list of certificates.
+    /// Creates a new keychain with a given key data, key id and a list of certificates.
     /// The leaf (entity) certificate must be the first in the list, and the root certificate must be the last.
     pub fn new<K, D, I>(key: K, local_key_id: D, chain: I) -> Self
     where
@@ -143,7 +143,7 @@ impl KeyStore {
     }
 
     /// Parse keystore from PKCS#12 data
-    pub fn from_pkcs12(data: &[u8], password: &str) -> crate::Result<Self> {
+    pub fn from_pkcs12(data: &[u8], password: &str) -> Result<Self> {
         let pfx = Pfx::from_der(data)?;
 
         if pfx.version != Version::V3 {
@@ -419,7 +419,6 @@ impl Pkcs12Writer<'_, '_> {
 
         let keys_safe = codec::key_bags_to_auth_safe(key_bags)?;
 
-        //let safes = OctetString::new(vec![certs_safe, keys_safe].to_der()?)?;
         let mut safes = vec![certs_safe, keys_safe];
 
         let secrets = self
@@ -443,7 +442,6 @@ impl Pkcs12Writer<'_, '_> {
             .flatten();
 
         for i in secrets {
-            //TODO: make it to content info
             safes.push(codec::key_bags_to_auth_safe(vec![i])?)
         }
 

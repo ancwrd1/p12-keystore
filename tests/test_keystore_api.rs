@@ -80,7 +80,6 @@ fn test_keystore_api_with_aes_key() {
 
     let keystore_with_ase_key = keystore_with_ase_key.unwrap();
     let entries = keystore_with_ase_key.entries();
-    // assert!(8usize == keystore_with_ase_key.entries_count());
 
     entries.for_each(|(i, e)| println!("\"{}\" => {:?}", i, e));
 }
@@ -93,8 +92,7 @@ fn test_keystore_read_write_copy() {
 
     if let Ok(keystore_with_keys) = keystore_with_keys {
         let store_data = keystore_with_keys.writer("welcome1").write().unwrap();
-        std::fs::write(format!("test_dummy.p12"), &store_data).unwrap();
-        println!("{:?}", BASE64_STANDARD.encode(&store_data));
+
         let keystore_with_keys_copy = KeyStore::from_pkcs12(&store_data, "welcome1").unwrap();
         assert_eq!(13, keystore_with_keys_copy.entries_count());
     }
@@ -103,11 +101,10 @@ fn test_keystore_read_write_copy() {
 #[test]
 fn test_keystore_create() {
     let mut keystore = KeyStore::new();
-    let secret = Secret::builder(SecretKeyType::AES).with_lenght(24).build().unwrap();
+    let secret = Secret::builder(SecretKeyType::AES).with_length(24).build().unwrap();
     keystore.add_entry("test", KeyStoreEntry::Secret(secret));
     let store_data = keystore.writer("welcome1").write().unwrap();
-    std::fs::write(format!("test_single_key.p12"), &store_data).unwrap();
-    println!("{:?}", BASE64_STANDARD.encode(&store_data));
+
     let keystore_with_keys_copy = KeyStore::from_pkcs12(&store_data, "welcome1").unwrap();
     assert_eq!(1, keystore_with_keys_copy.entries_count());
 }
