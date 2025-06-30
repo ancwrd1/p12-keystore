@@ -1,5 +1,3 @@
-use base64::prelude::BASE64_STANDARD;
-use base64::Engine;
 use p12_keystore::secret::{Secret, SecretKeyType};
 use p12_keystore::{KeyStore, KeyStoreEntry};
 

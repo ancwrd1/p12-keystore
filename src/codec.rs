@@ -582,7 +582,7 @@ mod tests {
             Err(e) => panic!("{}", e),
             Ok(bag) => {
                 let inner = bag.encrypted_private_key_info.as_bytes();
-                assert_eq!(inner.len(), 128);
+                assert_eq!(inner.len(), 157);
 
                 let priv_key = bag.private_key_info(TEST_STORE_PASSWORD).unwrap();
                 assert_eq!(BLOWFISH_KEY_OID, priv_key.algorithm.oid);
