@@ -32,3 +32,4 @@ rand = "0.9"
 base64 = "0.22.1"
 pkcs8 = { version = "0.10.2", features = ["pkcs5", "getrandom", "encryption"] }
 log = "0.4.27"
+oid-registry = "0.8.1"

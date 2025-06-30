@@ -1,5 +1,6 @@
+use base64::engine::general_purpose::STANDARD;
 use der::asn1::ContextSpecific;
-use der::{EncodeValue, Sequence, Tagged};
+use der::Sequence;
 
 use base64::Engine;
 use cms::{
@@ -12,7 +13,6 @@ use cms::{
     enveloped_data::EncryptedContentInfo,
 };
 
-use crate::keystore::Secret;
 use crate::{
     error::Error,
     keystore::{Certificate, EncryptionAlgorithm, MacAlgorithm, PrivateKeyChain},
@@ -37,6 +37,7 @@ use rand::random;
 use sha1::Sha1;
 use sha2::Sha256;
 
+use crate::secret::{Secret, SecretKeyType};
 #[cfg(feature = "pbes1")]
 use {
     crate::pbes1::{PbeMode, Pbes1},
@@ -272,24 +273,18 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
                 }
             }
             oid::PKCS_12_SECRET_BAG_OID => {
-                if let Ok(enc_key) = EncryptedPrivateKeyInfo::from_der(&bag.bag_value[25..]) {
-                    if let Ok(plain) = decrypt(
-                        &enc_key.encryption_algorithm,
-                        enc_key.encrypted_data.as_bytes(),
-                        password,
-                    ) {
-                        if let Ok(priv_key) = PrivateKeyInfo::from_der(&plain) {
-                            //println!("{:?}", priv_key);
-                            let algorithm_oid = priv_key.algorithm.oid.to_string();
-                            if let Some(local_key_id) = local_key_id {
-                                let key = Secret {
-                                    algorithm_oid,
-                                    key: priv_key.private_key.into_bytes(),
-                                    local_key_id,
-                                };
-                                secrets.push(ParsedSecret { friendly_name, key });
-                            }
-                        }
+                println!("PKCS_12_SECRET_BAG_OID DER {:?}", STANDARD.encode(&bag.bag_value));
+                let secred_bag = SecretBag::from_bag_der(&bag.bag_value)?;
+
+                if let Ok(priv_key) = secred_bag.private_key_info(password) {
+                    //println!("{:?}", priv_key);
+                    if let Some(local_key_id) = local_key_id {
+                        let key = Secret {
+                            key_type: SecretKeyType::from_oid(&priv_key.algorithm.oid),
+                            key: priv_key.private_key.into_bytes(),
+                            local_key_id,
+                        };
+                        secrets.push(ParsedSecret { friendly_name, key });
                     }
                 }
             }
@@ -345,6 +340,45 @@ pub fn certificate_to_safe_bag(
         bag_value: cert_bag.to_der()?,
         bag_attributes: Some(bag_attributes),
     })
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Sequence)]
+pub struct SecretBag {
+    pub algorithm_identifier: ObjectIdentifier,
+    #[asn1(context_specific = "0")]
+    pub priv_key_info: OctetString,
+    pub bag_attributes: Option<Attributes>,
+}
+
+impl SecretBag {
+    pub fn private_key_info(&self, passwd: &str) -> crate::Result<PrivateKeyInfo> {
+        if let Ok(enc_key) = pkcs12::pbe_params::EncryptedPrivateKeyInfo::from_der(&self.priv_key_info.as_bytes()) {
+            if let Ok(plain) =
+                crate::codec::decrypt(&enc_key.encryption_algorithm, enc_key.encrypted_data.as_bytes(), passwd)
+            {
+                if let Ok(priv_key) = PrivateKeyInfo::from_der(&plain) {
+                    println!("{:?}", priv_key);
+                    return Ok(priv_key);
+                }
+            }
+        }
+        Err(crate::error::Error::UnsupportedEncryptionScheme)
+    }
+
+    pub fn from_bag_der(data: &[u8]) -> crate::Result<SecretBag> {
+        let envelop = Any::from_der(data);
+        match envelop {
+            Ok(envelop) => {
+                let data = envelop.value();
+                let secret_bag = SecretBag::from_der(data);
+                match secret_bag {
+                    Ok(secret_bag) => Ok(secret_bag),
+                    Err(e) => Err(crate::error::Error::DerError(e)),
+                }
+            }
+            Err(e) => Err(crate::error::Error::DerError(e)),
+        }
+    }
 }
 
 pub fn private_key_to_safe_bag(
@@ -460,4 +494,42 @@ pub fn compute_mac(data: &[u8], algorithm: MacAlgorithm, iterations: u64, passwo
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::codec::SecretBag;
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine;
+    use der::{Any, Decode, Reader};
+    use pkcs8::EncryptedPrivateKeyInfo;
+
+    // Testdata for writing the full SecretBag struct
+    const SECRET_BAG_DATA : &str =  "oIGzMIGwBgsqhkiG9w0BDAoBAqCBoASBnTCBmjBmBgkqhkiG9w0BBQ0wWTA4BgkqhkiG9w0BBQwwKwQUnuKEvUWqBU1bJE7g5hYeIU3zsmYCAicQAgEgMAwGCCqGSIb3DQIJBQAwHQYJYIZIAWUDBAEqBBBEitwx8ZcwYypT521bjuv8BDAARNFyg3PJsKUGvngARYN+vtsXHVXEXLOlghj4awwBVf2BW1hZx5Zow+7CF6b/YE4=";
+
+    #[test]
+    fn test_deserialize_bag() {
+        let der = STANDARD.decode(SECRET_BAG_DATA).unwrap();
+        let top = Any::from_der(&der).unwrap();
+        // Step 2: Get the content (inner SEQUENCE)
+        let inner = top.value(); // `data` is the explicit contents of that [0] wrapper
+
+        // Step 3: Parse your struct from the inner bytes
+
+        match SecretBag::from_der(inner) {
+            Err(e) => panic!("{}", e),
+            Ok(bag) => {
+                println!("{:#?}", bag);
+                let inner = bag.priv_key_info.as_bytes();
+                let alg_ident = EncryptedPrivateKeyInfo::from_der(&inner).unwrap();
+                println!("{:#?}", alg_ident);
+                let priv_key = bag.private_key_info("changeit");
+                println!("{:#?}", priv_key);
+            }
+        };
+    }
+
+    #[test]
+    fn test_from_secrat_bag() {
+        let der = STANDARD.decode(SECRET_BAG_DATA).unwrap();
+        let secret = SecretBag::from_bag_der(der.as_slice());
+        assert!(secret.is_ok());
+    }
+}

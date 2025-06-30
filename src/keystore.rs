@@ -13,6 +13,7 @@ use pkcs12::{
 };
 
 use crate::codec::ParsedAuthSafe;
+use crate::secret::Secret;
 use crate::{codec, error::Error, oid, Result};
 
 /// X.509 certificate wrapper
@@ -109,23 +110,6 @@ impl fmt::Debug for PrivateKeyChain {
             .finish()
     }
 }
-#[derive(Clone, PartialEq, Eq)]
-pub struct Secret {
-    pub(crate) algorithm_oid: String,
-    pub(crate) key: Vec<u8>,
-    pub(crate) local_key_id: Vec<u8>,
-}
-
-impl fmt::Debug for Secret {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PrivateKeyChain")
-            .field("algorithm_oid", &self.algorithm_oid)
-            .field("key", &"<KEY>")
-            .field("local_key_id", &hex::encode(&self.local_key_id))
-            .finish()
-    }
-}
-
 /// KeyStoreEntry represents one entry in the keystore
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeyStoreEntry {
@@ -184,11 +168,7 @@ impl KeyStore {
         let mut parsed_secrets = Vec::new();
 
         for safe in safes.into_iter() {
-            let ParsedAuthSafe {
-                keys: keys,
-                certs,
-                secrets,
-            } = codec::parse_auth_safe(&safe, password)?;
+            let ParsedAuthSafe { keys, certs, secrets } = codec::parse_auth_safe(&safe, password)?;
             parsed_keys.extend(keys);
             parsed_certs.extend(certs);
             parsed_secrets.extend(secrets);
