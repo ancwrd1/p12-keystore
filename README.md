@@ -17,7 +17,7 @@ Features:
 * Support for 'truststores' with only CA root certificates
 * Modern and legacy encryption schemes
 * Able to read and write Java-compatible keystores
-* Support for secret keys and generation of secret keys
+* Support for secret keys and generation of secret keys compatible to Java
 
 Limitations:
 
