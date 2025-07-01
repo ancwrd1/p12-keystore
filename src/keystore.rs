@@ -425,14 +425,14 @@ impl Pkcs12Writer<'_, '_> {
             .keystore
             .entries
             .iter()
-            .filter_map(|(a, entry)| match entry {
+            .filter_map(|(alias, entry)| match entry {
                 KeyStoreEntry::PrivateKeyChain(_) => None,
                 KeyStoreEntry::Certificate(_) => None,
-                KeyStoreEntry::Secret(s) => {
+                KeyStoreEntry::Secret(secret) => {
                     let bag = secret_to_safe_bag(
-                        s,
+                        secret,
                         self.encryption_algorithm,
-                        a,
+                        alias,
                         self.encryption_iterations,
                         self.password,
                     );
@@ -441,8 +441,8 @@ impl Pkcs12Writer<'_, '_> {
             })
             .flatten();
 
-        for i in secrets {
-            safes.push(codec::key_bags_to_auth_safe(vec![i])?)
+        for secret in secrets {
+            safes.push(codec::key_bags_to_auth_safe(vec![secret])?)
         }
 
         let safe_bags = OctetString::new(safes.to_der()?)?;

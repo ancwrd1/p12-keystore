@@ -272,9 +272,9 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
                 }
             }
             oid::PKCS_12_SECRET_BAG_OID => {
-                let secred_bag = SecretBag::from_bag_der(&bag.bag_value)?;
+                let secret_bag = SecretBag::from_bag_der(&bag.bag_value)?;
 
-                if let Ok(priv_key) = secred_bag.private_key_info(password) {
+                if let Ok(priv_key) = secret_bag.private_key_info(password) {
                     if let Some(local_key_id) = local_key_id {
                         let key = Secret {
                             key_type: SecretKeyType::from_oid(&priv_key.algorithm.oid),
@@ -366,8 +366,8 @@ impl SecretBag {
     }
 
     pub fn from_bag_der(data: &[u8]) -> Result<SecretBag> {
-        let envelop = Any::from_der(data);
-        match envelop {
+        let envelope = Any::from_der(data);
+        match envelope {
             Ok(envelop) => {
                 let data = envelop.value();
                 let secret_bag = SecretBag::from_der(data);
@@ -421,12 +421,12 @@ pub fn secret_to_safe_bag(
 
     let (alg_id, encrypted) = encrypt(algorithm, iterations, &key_info_der, password)?;
 
-    let ecnrypted_key_info = EncryptedPrivateKeyInfo {
+    let encrypted_key_info = EncryptedPrivateKeyInfo {
         encryption_algorithm: alg_id,
         encrypted_data: OctetString::new(encrypted)?,
     };
 
-    let encrypted_key_info_os = OctetString::new(ecnrypted_key_info.to_der()?)?;
+    let encrypted_key_info_os = OctetString::new(encrypted_key_info.to_der()?)?;
 
     let secret_bag = SecretBag {
         object_identifier: PKCS_12_PKCS8_KEY_BAG_OID,
