@@ -116,7 +116,7 @@ impl SecretBuilder {
         self
     }
 
-    /// allows to overwrite the defaul OsRng based `RandomGenerator` implementation
+    /// allows overwriting the default OsRng based `RandomGenerator` implementation
     /// # Examples:
     /// ```
     /// use rand::rngs::ThreadRng;
