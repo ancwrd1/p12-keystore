@@ -3,10 +3,9 @@ use crate::oid::{
     CAMELIA_KEY_OID, DES_CBC_KEY_OID, DES_EDE3_CBC_KEY_OID, HMAC_SHA1_KEY_OID, HMAC_SHA224_KEY_OID,
     HMAC_SHA256_KEY_OID, HMAC_SHA384_KEY_OID, HMAC_SHA512_KEY_OID, RC2_CBC_KEY_OID, RC4_KEY_OID,
 };
+use crate::rand::rngs::OsRng;
 use cms::cert::x509::spki::ObjectIdentifier;
-use rand::rand_core::OsError;
-use rand::rngs::OsRng;
-use rand::TryRngCore;
+use rand::{RngCore, TryRngCore};
 use std::fmt;
 use std::time::UNIX_EPOCH;
 
@@ -79,6 +78,7 @@ pub struct SecretBuilder {
     key: Option<Vec<u8>>,
     local_key_id: Option<Vec<u8>>,
     key_len: Option<usize>,
+    rng: Box<dyn RandomGenerator>,
 }
 
 /// Implementation for the SecretBuilder methods
@@ -92,6 +92,7 @@ impl SecretBuilder {
             key: None,
             local_key_id: None,
             key_len,
+            rng: Box::new(OsRngRandomGenerator),
         }
     }
 
@@ -115,25 +116,40 @@ impl SecretBuilder {
         self
     }
 
+    /// allows to overwrite the defaul OsRng based `RandomGenerator` implementation
+    /// # Examples:
+    /// ```
+    /// use rand::rngs::ThreadRng;
+    /// use p12_keystore::secret::Secret;
+    /// use p12_keystore::secret::SecretKeyType::AES;
+    ///
+    /// let key = Secret::builder(AES).with_length(32).with_rng(ThreadRng::default()).build();
+    ///
+    /// ```
+    pub fn with_rng<R: RandomGenerator + 'static>(&mut self, rng: R) -> &mut Self {
+        self.rng = Box::new(rng);
+        self
+    }
+
     /// builds the secret
     pub fn build(&mut self) -> Result<Secret, SecretKeyBuilderError> {
         if self.local_key_id.is_none() {
-            let key_id_rng = OsRng.try_next_u32();
+            let key_id_rng = self.rng.try_next_u32();
 
             match key_id_rng {
                 Ok(key_id) => {
                     let ts = UNIX_EPOCH.elapsed().unwrap_or_default().as_millis();
                     self.local_key_id = Some(format!("{:0}:{:0}", ts, key_id).as_bytes().to_vec());
                 }
-                Err(e) => return Err(SecretKeyBuilderError::RandomGenerationError(e)),
+                Err(_) => return Err(SecretKeyBuilderError::RandomGenerationError),
             }
         }
 
         if self.key.is_none() {
             if let Some(key_len) = self.key_len {
                 let mut key = vec![0u8; key_len];
-                if let Err(e) = OsRng.try_fill_bytes(&mut key) {
-                    return Err(SecretKeyBuilderError::RandomGenerationError(e));
+                if self.rng.try_fill_bytes(&mut key).is_err() {
+                    return Err(SecretKeyBuilderError::RandomGenerationError);
                 }
                 self.key = Some(key);
             } else {
@@ -152,13 +168,56 @@ impl SecretBuilder {
         }
     }
 }
+/// Implements a simplified random generator which can be used dynamically
+pub trait RandomGenerator {
+    /// returns a random u32
+    fn try_next_u32(&mut self) -> Result<u32, SecretKeyBuilderError>;
+
+    /// fills a byte buffer with random
+    fn try_fill_bytes(&mut self, buf: &mut [u8]) -> Result<(), SecretKeyBuilderError>;
+}
+
+/// Implements random generator for all RngCore implementations
+impl<R: RngCore + ?Sized> RandomGenerator for R {
+    /// returns a random u32
+    fn try_next_u32(&mut self) -> Result<u32, SecretKeyBuilderError> {
+        Ok(R::next_u32(self))
+    }
+    /// fills a byte buffer with random
+    fn try_fill_bytes(&mut self, buf: &mut [u8]) -> Result<(), SecretKeyBuilderError> {
+        R::fill_bytes(self, buf);
+        Ok(())
+    }
+}
+
+/// OsRng based RandomGenerator
+#[derive(Default)]
+pub struct OsRngRandomGenerator;
+
+/// Implementation for OsRng
+impl RandomGenerator for OsRngRandomGenerator {
+    fn try_next_u32(&mut self) -> Result<u32, SecretKeyBuilderError> {
+        match OsRng.try_next_u32() {
+            Ok(rnd) => Ok(rnd),
+            Err(_) => Err(SecretKeyBuilderError::RandomGenerationError),
+        }
+    }
+
+    /// fills a byte buffer with random
+    fn try_fill_bytes(&mut self, buf: &mut [u8]) -> Result<(), SecretKeyBuilderError> {
+        match OsRng.try_fill_bytes(buf) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(SecretKeyBuilderError::RandomGenerationError),
+        }
+    }
+}
 
 /// Error, which can be returned by the `SecretBuilder`
 #[derive(Debug, PartialEq)]
 pub enum SecretKeyBuilderError {
     MissingKeyLength,
     MissingKeyOrLocalKeyId,
-    RandomGenerationError(OsError),
+    RandomGenerationError,
 }
 
 /// Available types of secrets. If the type is unknown, use `Unknown(<oid>)`
@@ -263,6 +322,7 @@ mod tests {
     use crate::oid::*;
     use crate::secret::{Secret, SecretKeyBuilderError, SecretKeyType};
     use der::oid::ObjectIdentifier;
+    use rand::rngs::ThreadRng;
 
     #[test]
     fn test_from_oid_str() {
@@ -444,6 +504,18 @@ mod tests {
             assert_eq!(secret.get_key_len(), 32);
             assert_eq!(key_val, secret.get_key());
             assert_eq!(key_id_val, secret.get_local_key_id());
+        }
+    }
+
+    #[test]
+    fn test_secret_builder_with_non_default_rng() {
+        let secret = Secret::builder(SecretKeyType::AES256Cbc)
+            .with_rng(ThreadRng::default())
+            .build();
+        assert!(secret.is_ok());
+        if let Ok(secret) = secret {
+            assert_eq!(secret.get_key_type(), SecretKeyType::AES256Cbc);
+            assert_eq!(secret.get_key_len(), 32);
         }
     }
 }
