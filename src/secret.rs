@@ -8,7 +8,7 @@ use rand::rand_core::OsError;
 use rand::rngs::OsRng;
 use rand::TryRngCore;
 use std::fmt;
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 /// Holds a secret key of a given type.
 #[derive(Clone, PartialEq, Eq)]
@@ -122,7 +122,7 @@ impl SecretBuilder {
 
             match key_id_rng {
                 Ok(key_id) => {
-                    let ts = UNIX_EPOCH.elapsed().unwrap_or(Duration::from_secs(0)).as_millis();
+                    let ts = UNIX_EPOCH.elapsed().unwrap_or_default().as_millis();
                     self.local_key_id = Some(format!("{:0}:{:0}", ts, key_id).as_bytes().to_vec());
                 }
                 Err(e) => return Err(SecretKeyBuilderError::RandomGenerationError(e)),
