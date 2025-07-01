@@ -3,9 +3,8 @@ use crate::oid::{
     CAMELIA_KEY_OID, DES_CBC_KEY_OID, DES_EDE3_CBC_KEY_OID, HMAC_SHA1_KEY_OID, HMAC_SHA224_KEY_OID,
     HMAC_SHA256_KEY_OID, HMAC_SHA384_KEY_OID, HMAC_SHA512_KEY_OID, RC2_CBC_KEY_OID, RC4_KEY_OID,
 };
-use crate::rand::rngs::OsRng;
 use cms::cert::x509::spki::ObjectIdentifier;
-use rand::{RngCore, TryRngCore};
+use rand::{rngs::OsRng, RngCore, TryRngCore};
 use std::fmt;
 use std::time::UNIX_EPOCH;
 
