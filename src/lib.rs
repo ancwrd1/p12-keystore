@@ -31,6 +31,8 @@ mod oid;
 mod pbes1;
 pub mod secret;
 
+pub use rand;
+
 /// Result type for keystore operations
 pub type Result<T> = std::result::Result<T, error::Error>;
 
