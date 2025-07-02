@@ -203,16 +203,16 @@ fn test_keystore_api() {
 #[test]
 fn test_keystore_api_with_aes_key() {
     //let entries = Map<String,>
-    let keystore_with_ase_key = KeyStore::from_pkcs12(PBES2_KEYSTORE_AES_KEY, PASSWORD);
+    let keystore_with_aes_key = KeyStore::from_pkcs12(PBES2_KEYSTORE_AES_KEY, PASSWORD);
 
-    assert!(&keystore_with_ase_key.is_ok());
+    assert!(&keystore_with_aes_key.is_ok());
 
-    let keystore_with_ase_key = keystore_with_ase_key.unwrap();
+    let keystore_with_aes_key = keystore_with_aes_key.unwrap();
 
-    assert_eq!(13, keystore_with_ase_key.entries_count());
+    assert_eq!(13, keystore_with_aes_key.entries_count());
 
     for (name, oid, local_key_id, key) in TEST_ENTRIES {
-        if let Some(entry) = keystore_with_ase_key.entry(name) {
+        if let Some(entry) = keystore_with_aes_key.entry(name) {
             if let KeyStoreEntry::Secret(secret) = entry {
                 assert_eq!(oid.to_string(), secret.get_key_type().to_oid().to_string());
                 assert_eq!(*local_key_id, secret.get_local_key_id().as_slice());
