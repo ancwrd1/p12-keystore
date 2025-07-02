@@ -70,7 +70,11 @@ fn test_parse_self_signed_pfx() {
 
     let key_chain = keystore.private_key_chain().unwrap().1;
 
-    assert_eq!(1, key_chain.chain().len(), "self-signed certificates must not be duplicated");
+    assert_eq!(
+        1,
+        key_chain.chain().len(),
+        "self-signed certificates must not be duplicated"
+    );
 }
 
 #[test]
