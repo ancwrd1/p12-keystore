@@ -1,5 +1,5 @@
 use cbc::cipher::{
-    block_padding::Pkcs7, BlockCipher, BlockDecrypt, BlockDecryptMut, BlockEncrypt, BlockEncryptMut, KeyInit, KeyIvInit,
+    BlockCipher, BlockDecrypt, BlockDecryptMut, BlockEncrypt, BlockEncryptMut, KeyInit, KeyIvInit, block_padding::Pkcs7,
 };
 use der::oid::ObjectIdentifier;
 use des::TdesEde3;
@@ -7,7 +7,7 @@ use pkcs12::kdf;
 use rc2::Rc2;
 use sha1::Sha1;
 
-use crate::{error::Error, oid, Result};
+use crate::{Result, error::Error, oid};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PbeMode {

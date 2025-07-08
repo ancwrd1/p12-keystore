@@ -1,14 +1,14 @@
 use std::{
-    collections::{btree_map::Iter, BTreeMap},
+    collections::{BTreeMap, btree_map::Iter},
     fmt,
 };
 
-use crate::codec::{secret_to_safe_bag, ParsedAuthSafe};
+use crate::codec::{ParsedAuthSafe, secret_to_safe_bag};
 use crate::secret::Secret;
-use crate::{codec, error::Error, oid, Result};
+use crate::{Result, codec, error::Error, oid};
 use cms::content_info::ContentInfo;
 use der::oid::ObjectIdentifier;
-use der::{asn1::OctetString, Any, Decode, Encode};
+use der::{Any, Decode, Encode, asn1::OctetString};
 use hex::ToHex;
 use pkcs12::{
     authenticated_safe::AuthenticatedSafe,

@@ -218,10 +218,10 @@ fn test_keystore_api_with_aes_key() {
                 assert_eq!(*local_key_id, secret.get_local_key_id().as_slice());
                 assert_eq!(*key, secret.get_key());
             } else {
-                panic!("Wrong entry type {:?}", entry);
+                panic!("Wrong entry type {entry:?}");
             }
         } else {
-            panic!("Entry {} not found", name);
+            panic!("Entry {name} not found");
         }
     }
 }

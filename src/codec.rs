@@ -1,5 +1,5 @@
-use der::asn1::ContextSpecific;
 use der::Sequence;
+use der::asn1::ContextSpecific;
 
 use cms::{
     cert::{
@@ -12,15 +12,17 @@ use cms::{
 };
 
 use crate::{
+    Result,
     error::Error,
     keystore::{Certificate, EncryptionAlgorithm, MacAlgorithm, PrivateKeyChain},
-    oid, Result,
+    oid,
 };
 use der::{
-    asn1::{BmpString, ObjectIdentifier, OctetString, OctetStringRef, SetOfVec},
     Any, Decode, Encode,
+    asn1::{BmpString, ObjectIdentifier, OctetString, OctetStringRef, SetOfVec},
 };
-use hmac::{digest::Digest, Mac};
+use hmac::{Mac, digest::Digest};
+use pkcs5::pbes2;
 use pkcs12::safe_bag::{Pkcs8Version, PrivateKeyInfo};
 use pkcs12::{
     cert_type::CertBag,
@@ -30,7 +32,6 @@ use pkcs12::{
     pbe_params::EncryptedPrivateKeyInfo,
     safe_bag::{SafeBag, SafeContents},
 };
-use pkcs5::pbes2;
 use rand::random;
 use sha1::Sha1;
 use sha2::Sha256;
@@ -100,10 +101,7 @@ pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()>
 
 pub fn parse_auth_safe(safe: &ContentInfo, password: &str) -> Result<ParsedAuthSafe> {
     let data = match safe.content_type {
-        oid::CONTENT_TYPE_DATA_OID => {
-            let os = OctetString::from_der(&safe.content.to_der()?)?.as_bytes().to_vec();
-            os
-        }
+        oid::CONTENT_TYPE_DATA_OID => OctetString::from_der(&safe.content.to_der()?)?.as_bytes().to_vec(),
         oid::CONTENT_TYPE_ENCRYPTED_DATA_OID => {
             let enc_data = EncryptedData::from_der(&safe.content.to_der()?)?;
             if enc_data.version != CmsVersion::V0 {
@@ -557,18 +555,18 @@ pub fn compute_mac(data: &[u8], algorithm: MacAlgorithm, iterations: u64, passwo
 
 #[cfg(test)]
 mod tests {
-    use crate::codec::{secret_to_safe_bag, SecretBag};
+    use crate::EncryptionAlgorithm;
+    use crate::codec::{SecretBag, secret_to_safe_bag};
     use crate::oid::BLOWFISH_KEY_OID;
     use crate::secret::Secret;
     use crate::secret::SecretKeyType::AES;
-    use crate::EncryptionAlgorithm;
-    use base64::engine::general_purpose::STANDARD;
     use base64::Engine;
+    use base64::engine::general_purpose::STANDARD;
     use der::{Any, Decode, Encode};
     use pkcs12::safe_bag::SafeBag;
 
     // Testdata for writing the full SecretBag struct
-    const SECRET_BAG_DATA : &str =  "oIGzMIGwBgsqhkiG9w0BDAoBAqCBoASBnTCBmjBmBgkqhkiG9w0BBQ0wWTA4BgkqhkiG9w0BBQwwKwQUnuKEvUWqBU1bJE7g5hYeIU3zsmYCAicQAgEgMAwGCCqGSIb3DQIJBQAwHQYJYIZIAWUDBAEqBBBEitwx8ZcwYypT521bjuv8BDAARNFyg3PJsKUGvngARYN+vtsXHVXEXLOlghj4awwBVf2BW1hZx5Zow+7CF6b/YE4=";
+    const SECRET_BAG_DATA: &str = "oIGzMIGwBgsqhkiG9w0BDAoBAqCBoASBnTCBmjBmBgkqhkiG9w0BBQ0wWTA4BgkqhkiG9w0BBQwwKwQUnuKEvUWqBU1bJE7g5hYeIU3zsmYCAicQAgEgMAwGCCqGSIb3DQIJBQAwHQYJYIZIAWUDBAEqBBBEitwx8ZcwYypT521bjuv8BDAARNFyg3PJsKUGvngARYN+vtsXHVXEXLOlghj4awwBVf2BW1hZx5Zow+7CF6b/YE4=";
     const TEST_STORE_PASSWORD: &str = "changeit";
 
     #[test]
@@ -605,7 +603,7 @@ mod tests {
                     assert_eq!(key, priv_key_info.private_key.as_bytes());
                 }
                 Err(e) => {
-                    panic!("PrivateKey not readable: {:}", e);
+                    panic!("PrivateKey not readable: {e:}");
                 }
             }
         }

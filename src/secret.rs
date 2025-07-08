@@ -4,7 +4,7 @@ use crate::oid::{
     HMAC_SHA256_KEY_OID, HMAC_SHA384_KEY_OID, HMAC_SHA512_KEY_OID, RC2_CBC_KEY_OID, RC4_KEY_OID,
 };
 use cms::cert::x509::spki::ObjectIdentifier;
-use rand::{rngs::OsRng, RngCore, TryRngCore};
+use rand::{RngCore, TryRngCore, rngs::OsRng};
 use std::fmt;
 use std::time::UNIX_EPOCH;
 
@@ -138,7 +138,7 @@ impl SecretBuilder {
             match key_id_rng {
                 Ok(key_id) => {
                     let ts = UNIX_EPOCH.elapsed().unwrap_or_default().as_millis();
-                    self.local_key_id = Some(format!("{:0}:{:0}", ts, key_id).as_bytes().to_vec());
+                    self.local_key_id = Some(format!("{ts:0}:{key_id:0}").as_bytes().to_vec());
                 }
                 Err(_) => return Err(SecretKeyBuilderError::RandomGenerationError),
             }
