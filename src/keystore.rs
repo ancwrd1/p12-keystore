@@ -242,7 +242,7 @@ impl KeyStore {
     }
 
     /// Get entries iterator
-    pub fn entries(&self) -> Entries {
+    pub fn entries(&self) -> Entries<'_> {
         let iter = self.entries.iter();
         Entries { iter }
     }
