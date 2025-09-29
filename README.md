@@ -34,13 +34,17 @@ use p12_keystore::KeyStore;
 
 const PASSWORD: &str = "changeit";
 
-fn main() -> Result<(), Box<dyn std::error::Error>>{
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let data = std::fs::read(std::env::args().nth(1).unwrap())?;
 
     let keystore = KeyStore::from_pkcs12(&data, PASSWORD)?;
 
     if let Some((alias, chain)) = keystore.private_key_chain() {
-        println!("Private key chain found, alias: {}, subject: {}", alias, chain.chain()[0].subject());
+        println!(
+            "Private key chain found, alias: {}, subject: {}",
+            alias,
+            chain.chain()[0].subject()
+        );
     }
 
     Ok(())
