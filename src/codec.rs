@@ -553,7 +553,7 @@ mod tests {
     use crate::codec::{SecretBag, secret_to_safe_bag};
     use crate::oid::BLOWFISH_KEY_OID;
     use crate::secret::Secret;
-    use crate::secret::SecretKeyType::AES;
+    use crate::secret::SecretKeyType::Aes;
     use base64::Engine;
     use base64::engine::general_purpose::STANDARD;
     use der::{Any, Decode, Encode};
@@ -605,7 +605,7 @@ mod tests {
 
     #[test]
     fn test_secret_to_safe_bag() {
-        let secret = Secret::builder(AES).with_length(32).build().unwrap();
+        let secret = Secret::builder(Aes).with_length(32).build().unwrap();
         let bag = secret_to_safe_bag(
             &secret,
             EncryptionAlgorithm::PbeWithHmacSha256AndAes256,
@@ -624,6 +624,6 @@ mod tests {
 
         let private_key_value = private_key_info.private_key.into_bytes();
         assert_eq!(secret.key(), private_key_value);
-        assert_eq!(secret.key_len(), private_key_value.len());
+        assert_eq!(secret.key().len(), private_key_value.len());
     }
 }

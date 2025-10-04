@@ -245,7 +245,7 @@ fn test_keystore_read_write_copy() {
 #[test]
 fn test_keystore_create() {
     let mut keystore = KeyStore::new();
-    let secret = Secret::builder(SecretKeyType::AES).with_length(24).build().unwrap();
+    let secret = Secret::builder(SecretKeyType::Aes).with_length(24).build().unwrap();
     keystore.add_entry("test", KeyStoreEntry::Secret(secret));
     let store_data = keystore.writer("welcome1").write().unwrap();
 
