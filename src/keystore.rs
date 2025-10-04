@@ -28,8 +28,7 @@ pub struct PrivateKey {
 }
 
 impl PrivateKey {
-    /// Parses a PKCS#8 private key encoded in DER format and constructs
-    /// a new instance of the struct implementing this method.
+    /// Parses a PKCS#8 private key encoded in DER format and constructs a new instance of the struct.
     pub fn from_der(data: &[u8]) -> Result<Self> {
         let info: PrivateKeyInfo = data.try_into().map_err(|_| Error::InvalidPrivateKey)?;
         Ok(Self {
