@@ -1,36 +1,39 @@
-use crate::oid::{
-    AES_128_CBC_KEY_OID, AES_192_CBC_KEY_OID, AES_256_CBC_KEY_OID, AES_GROUP_KEY_OID, BLOWFISH_KEY_OID,
-    CAMELIA_KEY_OID, DES_CBC_KEY_OID, DES_EDE3_CBC_KEY_OID, HMAC_SHA1_KEY_OID, HMAC_SHA224_KEY_OID,
-    HMAC_SHA256_KEY_OID, HMAC_SHA384_KEY_OID, HMAC_SHA512_KEY_OID, RC2_CBC_KEY_OID, RC4_KEY_OID,
+use std::{fmt, time::UNIX_EPOCH};
+
+use crate::{
+    keystore::LocalKeyId,
+    oid::{
+        AES_128_CBC_KEY_OID, AES_192_CBC_KEY_OID, AES_256_CBC_KEY_OID, AES_GROUP_KEY_OID, BLOWFISH_KEY_OID,
+        CAMELIA_KEY_OID, DES_CBC_KEY_OID, DES_EDE3_CBC_KEY_OID, HMAC_SHA1_KEY_OID, HMAC_SHA224_KEY_OID,
+        HMAC_SHA256_KEY_OID, HMAC_SHA384_KEY_OID, HMAC_SHA512_KEY_OID, RC2_CBC_KEY_OID, RC4_KEY_OID,
+    },
 };
-use cms::cert::x509::spki::ObjectIdentifier;
+use der::oid::ObjectIdentifier;
 use rand::{RngCore, TryRngCore, rngs::OsRng};
-use std::fmt;
-use std::time::UNIX_EPOCH;
 
 /// Holds a secret key of a given type.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Secret {
     pub(crate) key_type: SecretKeyType,
     pub(crate) key: Vec<u8>,
-    pub(crate) local_key_id: Vec<u8>,
+    pub(crate) local_key_id: LocalKeyId,
 }
 
 /// Implementation of the `Secret` methods.
 impl Secret {
     /// Get key data
-    pub fn get_key(&self) -> &[u8] {
+    pub fn key(&self) -> &[u8] {
         &self.key
     }
 
     /// Get the key type
-    pub fn get_key_type(&self) -> SecretKeyType {
+    pub fn key_type(&self) -> SecretKeyType {
         self.key_type
     }
 
     /// gets the local_key_id as bytes
-    pub fn get_local_key_id(&self) -> Vec<u8> {
-        self.local_key_id.clone()
+    pub fn local_key_id(&self) -> &LocalKeyId {
+        &self.local_key_id
     }
 
     /// The builder to build a secret of a given type. If the type has no length assigned,
@@ -47,7 +50,7 @@ impl Secret {
     }
 
     /// returns the key length in bytes
-    pub fn get_key_len(&self) -> usize {
+    pub fn key_len(&self) -> usize {
         self.key.len()
     }
 }
@@ -75,7 +78,7 @@ impl Secret {
 pub struct SecretBuilder {
     key_type: SecretKeyType,
     key: Option<Vec<u8>>,
-    local_key_id: Option<Vec<u8>>,
+    local_key_id: Option<LocalKeyId>,
     key_len: Option<usize>,
     rng: Box<dyn RandomGenerator>,
 }
@@ -110,8 +113,11 @@ impl SecretBuilder {
     }
 
     /// Predefines the local_key_id. If omitted, it is generated based on timestamp and random.
-    pub fn with_local_key_id(&mut self, local_key_id: Vec<u8>) -> &mut Self {
-        self.local_key_id = Some(local_key_id);
+    pub fn with_local_key_id<K>(&mut self, local_key_id: K) -> &mut Self
+    where
+        K: Into<LocalKeyId>,
+    {
+        self.local_key_id = Some(local_key_id.into());
         self
     }
 
@@ -138,7 +144,7 @@ impl SecretBuilder {
             match key_id_rng {
                 Ok(key_id) => {
                     let ts = UNIX_EPOCH.elapsed().unwrap_or_default().as_millis();
-                    self.local_key_id = Some(format!("{ts:0}:{key_id:0}").as_bytes().to_vec());
+                    self.local_key_id = Some(format!("{ts:0}:{key_id:0}").into());
                 }
                 Err(_) => return Err(SecretKeyBuilderError::RandomGenerationError),
             }
@@ -318,6 +324,7 @@ impl fmt::Debug for Secret {
 
 #[cfg(test)]
 mod tests {
+    use crate::keystore::LocalKeyId;
     use crate::oid::*;
     use crate::secret::{Secret, SecretKeyBuilderError, SecretKeyType};
     use der::oid::ObjectIdentifier;
@@ -424,7 +431,7 @@ mod tests {
     fn test_getters() {
         let initial_key = vec![1, 2, 3];
         let initial_key_type = SecretKeyType::AES128Cbc;
-        let initial_local_key_id = vec![10, 20, 30];
+        let initial_local_key_id: LocalKeyId = vec![10, 20, 30].into();
 
         let secret = Secret {
             key: initial_key.clone(),
@@ -433,9 +440,9 @@ mod tests {
         };
 
         // Test getters for initial values
-        assert_eq!(secret.get_key(), &initial_key[..]);
-        assert_eq!(secret.get_key_type(), initial_key_type);
-        assert_eq!(secret.get_local_key_id(), initial_local_key_id);
+        assert_eq!(secret.key(), &initial_key[..]);
+        assert_eq!(secret.key_type(), initial_key_type);
+        assert_eq!(secret.local_key_id(), &initial_local_key_id);
     }
 
     #[test]
@@ -443,8 +450,8 @@ mod tests {
         let secret = Secret::builder(SecretKeyType::AES256Cbc).build();
         assert!(secret.is_ok());
         if let Ok(secret) = secret {
-            assert_eq!(secret.get_key_type(), SecretKeyType::AES256Cbc);
-            assert_eq!(secret.get_key_len(), 32);
+            assert_eq!(secret.key_type(), SecretKeyType::AES256Cbc);
+            assert_eq!(secret.key_len(), 32);
         }
     }
 
@@ -453,8 +460,8 @@ mod tests {
         let secret = Secret::builder(SecretKeyType::AES).with_length(16).build();
         assert!(secret.is_ok());
         if let Ok(secret) = secret {
-            assert_eq!(secret.get_key_type(), SecretKeyType::AES);
-            assert_eq!(secret.get_key_len(), 16);
+            assert_eq!(secret.key_type(), SecretKeyType::AES);
+            assert_eq!(secret.key_len(), 16);
         }
     }
 
@@ -463,8 +470,8 @@ mod tests {
         let secret = Secret::builder(SecretKeyType::AES192Cbc).build();
         assert!(secret.is_ok());
         if let Ok(secret) = secret {
-            assert_eq!(secret.get_key_type(), SecretKeyType::AES192Cbc);
-            assert_eq!(secret.get_key_len(), 24);
+            assert_eq!(secret.key_type(), SecretKeyType::AES192Cbc);
+            assert_eq!(secret.key_len(), 24);
         }
     }
 
@@ -483,26 +490,26 @@ mod tests {
         let secret = Secret::builder(SecretKeyType::AES).with_key(key_val.clone()).build();
         assert!(secret.is_ok());
         if let Ok(secret) = secret {
-            assert_eq!(secret.get_key_type(), SecretKeyType::AES);
-            assert_eq!(secret.get_key_len(), 32);
-            assert_eq!(key_val, secret.get_key());
+            assert_eq!(secret.key_type(), SecretKeyType::AES);
+            assert_eq!(secret.key_len(), 32);
+            assert_eq!(key_val, secret.key());
         }
     }
 
     #[test]
     fn test_secret_builder_with_val_n_id() {
         let key_val = [[17u8; 32]].as_flattened().to_vec();
-        let key_id_val = [[0u8; 20]].as_flattened().to_vec();
+        let key_id_val: LocalKeyId = [[0u8; 20]].as_flattened().into();
         let secret = Secret::builder(SecretKeyType::AES256Cbc)
             .with_key(key_val.clone())
             .with_local_key_id(key_id_val.clone())
             .build();
         assert!(secret.is_ok());
         if let Ok(secret) = secret {
-            assert_eq!(secret.get_key_type(), SecretKeyType::AES256Cbc);
-            assert_eq!(secret.get_key_len(), 32);
-            assert_eq!(key_val, secret.get_key());
-            assert_eq!(key_id_val, secret.get_local_key_id());
+            assert_eq!(secret.key_type(), SecretKeyType::AES256Cbc);
+            assert_eq!(secret.key_len(), 32);
+            assert_eq!(key_val, secret.key());
+            assert_eq!(&key_id_val, secret.local_key_id());
         }
     }
 
@@ -513,8 +520,8 @@ mod tests {
             .build();
         assert!(secret.is_ok());
         if let Ok(secret) = secret {
-            assert_eq!(secret.get_key_type(), SecretKeyType::AES256Cbc);
-            assert_eq!(secret.get_key_len(), 32);
+            assert_eq!(secret.key_type(), SecretKeyType::AES256Cbc);
+            assert_eq!(secret.key_len(), 32);
         }
     }
 }

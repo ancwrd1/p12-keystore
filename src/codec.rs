@@ -1,44 +1,37 @@
-use der::Sequence;
-use der::asn1::ContextSpecific;
-
 use cms::{
-    cert::{
-        x509::attr::{Attribute, AttributeValue, Attributes},
-        x509::spki::AlgorithmIdentifierOwned,
+    cert::x509::{
+        attr::{Attribute, AttributeValue, Attributes},
+        spki::AlgorithmIdentifierOwned,
     },
     content_info::{CmsVersion, ContentInfo},
     encrypted_data::EncryptedData,
     enveloped_data::EncryptedContentInfo,
 };
-
-use crate::{
-    Result,
-    error::Error,
-    keystore::{Certificate, EncryptionAlgorithm, MacAlgorithm, PrivateKeyChain},
-    oid,
-};
 use der::{
-    Any, Decode, Encode,
-    asn1::{BmpString, ObjectIdentifier, OctetString, OctetStringRef, SetOfVec},
+    Any, Decode, Encode, Sequence,
+    asn1::{BmpString, ContextSpecific, ObjectIdentifier, OctetString, OctetStringRef, SetOfVec},
 };
 use hmac::{Mac, digest::Digest};
 use pkcs5::pbes2;
-use pkcs12::safe_bag::{Pkcs8Version, PrivateKeyInfo};
 use pkcs12::{
     cert_type::CertBag,
     digest_info::DigestInfo,
     kdf,
     mac_data::MacData,
     pbe_params::EncryptedPrivateKeyInfo,
-    safe_bag::{SafeBag, SafeContents},
+    safe_bag::{Pkcs8Version, PrivateKeyInfo, SafeBag, SafeContents},
 };
 use rand::random;
 use sha1::Sha1;
 use sha2::Sha256;
 
-use crate::keystore::PrivateKey;
-use crate::oid::PKCS_12_PKCS8_KEY_BAG_OID;
-use crate::secret::{Secret, SecretKeyType};
+use crate::{
+    Result,
+    error::Error,
+    keystore::{Certificate, EncryptionAlgorithm, MacAlgorithm, PrivateKey, PrivateKeyChain},
+    oid::{self, PKCS_12_PKCS8_KEY_BAG_OID},
+    secret::{Secret, SecretKeyType},
+};
 #[cfg(feature = "pbes1")]
 use {
     crate::pbes1::{PbeMode, Pbes1},
@@ -279,7 +272,7 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
                     let key = Secret {
                         key_type: SecretKeyType::from_oid(&priv_key.algorithm.oid),
                         key: priv_key.private_key.into_bytes(),
-                        local_key_id,
+                        local_key_id: local_key_id.into(),
                     };
                     secrets.push(ParsedSecret { friendly_name, key });
                 }
@@ -394,8 +387,9 @@ pub fn secret_to_safe_bag(
         values: friendly_name,
     })?;
 
-    let local_key_id =
-        SetOfVec::<AttributeValue>::from_iter([Any::from_der(&OctetStringRef::new(&key.local_key_id)?.to_der()?)?])?;
+    let local_key_id = SetOfVec::<AttributeValue>::from_iter([Any::from_der(
+        &OctetStringRef::new(key.local_key_id.as_ref())?.to_der()?,
+    )?])?;
 
     bag_attributes.insert(Attribute {
         oid: oid::LOCAL_KEY_ID_OID,
@@ -629,7 +623,7 @@ mod tests {
         let private_key_info = bag.private_key_info(TEST_STORE_PASSWORD).unwrap();
 
         let private_key_value = private_key_info.private_key.into_bytes();
-        assert_eq!(secret.get_key(), private_key_value);
-        assert_eq!(secret.get_key_len(), private_key_value.len());
+        assert_eq!(secret.key(), private_key_value);
+        assert_eq!(secret.key_len(), private_key_value.len());
     }
 }

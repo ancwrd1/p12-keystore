@@ -1,7 +1,9 @@
 extern crate core;
 
-use p12_keystore::secret::{Secret, SecretKeyType};
-use p12_keystore::{KeyStore, KeyStoreEntry};
+use p12_keystore::{
+    KeyStore, KeyStoreEntry,
+    secret::{Secret, SecretKeyType},
+};
 
 const PBES1_KEYSTORE: &[u8] = include_bytes!("../tests/assets/pbes1-keystore.p12");
 const PBES1_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pbes1-truststore.p12");
@@ -214,9 +216,9 @@ fn test_keystore_api_with_aes_key() {
     for (name, oid, local_key_id, key) in TEST_ENTRIES {
         if let Some(entry) = keystore_with_aes_key.entry(name) {
             if let KeyStoreEntry::Secret(secret) = entry {
-                assert_eq!(oid.to_string(), secret.get_key_type().to_oid().to_string());
-                assert_eq!(*local_key_id, secret.get_local_key_id().as_slice());
-                assert_eq!(*key, secret.get_key());
+                assert_eq!(oid.to_string(), secret.key_type().to_oid().to_string());
+                assert_eq!(*local_key_id, secret.local_key_id().as_ref());
+                assert_eq!(*key, secret.key());
             } else {
                 panic!("Wrong entry type {entry:?}");
             }
