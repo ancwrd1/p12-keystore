@@ -43,8 +43,8 @@ impl PrivateKey {
     }
 
     /// Returns an ObjectIdentifier of the key algorithm.
-    pub fn oid(&self) -> ObjectIdentifier {
-        self.oid
+    pub fn oid(&self) -> &ObjectIdentifier {
+        &self.oid
     }
 }
 
