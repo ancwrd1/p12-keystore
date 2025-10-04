@@ -50,4 +50,7 @@ pub enum Error {
 
     #[error(transparent)]
     MacError(#[from] MacError),
+
+    #[error("Invalid private key")]
+    InvalidPrivateKey,
 }

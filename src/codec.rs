@@ -36,6 +36,7 @@ use rand::random;
 use sha1::Sha1;
 use sha2::Sha256;
 
+use crate::keystore::PrivateKey;
 use crate::oid::PKCS_12_PKCS8_KEY_BAG_OID;
 use crate::secret::{Secret, SecretKeyType};
 #[cfg(feature = "pbes1")]
@@ -262,9 +263,9 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
 
                 if let Some(local_key_id) = local_key_id {
                     let key = PrivateKeyChain {
-                        key: decrypted,
-                        local_key_id,
-                        chain: vec![],
+                        key: PrivateKey::from_der(&decrypted)?,
+                        local_key_id: local_key_id.into(),
+                        certs: vec![],
                     };
                     keys.push(ParsedKeyChain { friendly_name, key });
                 }
@@ -456,15 +457,16 @@ pub fn private_key_to_safe_bag(
         values: friendly_name,
     })?;
 
-    let local_key_id =
-        SetOfVec::<AttributeValue>::from_iter([Any::from_der(&OctetStringRef::new(&key.local_key_id)?.to_der()?)?])?;
+    let local_key_id = SetOfVec::<AttributeValue>::from_iter([Any::from_der(
+        &OctetStringRef::new(key.local_key_id.as_ref())?.to_der()?,
+    )?])?;
 
     bag_attributes.insert(Attribute {
         oid: oid::LOCAL_KEY_ID_OID,
         values: local_key_id,
     })?;
 
-    let (alg_id, encrypted) = encrypt(algorithm, iterations, &key.key, password)?;
+    let (alg_id, encrypted) = encrypt(algorithm, iterations, key.key().as_der(), password)?;
 
     let pk_info = EncryptedPrivateKeyInfo {
         encryption_algorithm: alg_id,

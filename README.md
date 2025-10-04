@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!(
             "Private key chain found, alias: {}, subject: {}",
             alias,
-            chain.chain()[0].subject()
+            chain.certs()[0].subject()
         );
     }
 

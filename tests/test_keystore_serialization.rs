@@ -13,7 +13,7 @@ fn common_read_test(pkcs12: &[u8]) {
     let keystore = KeyStore::from_pkcs12(pkcs12, PASSWORD).unwrap();
 
     for e in keystore.entries() {
-        println!("{}: {:#?}", e.0, e.1)
+        println!("{}: {:#?}", e.0, e.1);
     }
 }
 
@@ -72,7 +72,7 @@ fn test_parse_self_signed_pfx() {
 
     assert_eq!(
         1,
-        key_chain.chain().len(),
+        key_chain.certs().len(),
         "self-signed certificates must not be duplicated"
     );
 }

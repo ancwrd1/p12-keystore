@@ -3,17 +3,100 @@ use std::{
     fmt,
 };
 
-use crate::codec::{ParsedAuthSafe, secret_to_safe_bag};
-use crate::secret::Secret;
-use crate::{Result, codec, error::Error, oid};
+use crate::{
+    Result, codec,
+    codec::{ParsedAuthSafe, secret_to_safe_bag},
+    error::Error,
+    oid,
+    secret::Secret,
+};
 use cms::content_info::ContentInfo;
 use der::oid::ObjectIdentifier;
 use der::{Any, Decode, Encode, asn1::OctetString};
 use hex::ToHex;
+use pkcs8::PrivateKeyInfo;
 use pkcs12::{
     authenticated_safe::AuthenticatedSafe,
     pfx::{Pfx, Version},
 };
+
+/// PKCS#8 private key wrapper
+#[derive(Clone, PartialEq, Eq)]
+pub struct PrivateKey {
+    pub(crate) data: Vec<u8>,
+    pub(crate) oid: ObjectIdentifier,
+}
+
+impl PrivateKey {
+    /// Parses a PKCS#8 private key encoded in DER format and constructs
+    /// a new instance of the struct implementing this method.
+    pub fn from_der(data: &[u8]) -> Result<Self> {
+        let info: PrivateKeyInfo = data.try_into().map_err(|_| Error::InvalidPrivateKey)?;
+        Ok(Self {
+            data: data.to_vec(),
+            oid: info.algorithm.oid,
+        })
+    }
+
+    /// Returns a reference to the private key data in PKCS#8 DER-encoded format.
+    pub fn as_der(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Returns an ObjectIdentifier of the key algorithm.
+    pub fn oid(&self) -> ObjectIdentifier {
+        self.oid
+    }
+}
+
+impl fmt::Debug for PrivateKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PrivateKey")
+            .field("data", &"<PKCS#8>")
+            .field("oid", &self.oid)
+            .finish()
+    }
+}
+
+/// Wrapper for the local key id.
+#[derive(Clone, PartialEq, Eq)]
+pub struct LocalKeyId(pub Vec<u8>);
+
+impl From<Vec<u8>> for LocalKeyId {
+    fn from(value: Vec<u8>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<&[u8]> for LocalKeyId {
+    fn from(value: &[u8]) -> Self {
+        Self(value.to_vec())
+    }
+}
+
+impl From<&str> for LocalKeyId {
+    fn from(value: &str) -> Self {
+        Self(value.as_bytes().to_vec())
+    }
+}
+
+impl From<String> for LocalKeyId {
+    fn from(value: String) -> Self {
+        Self(value.into())
+    }
+}
+
+impl AsRef<[u8]> for LocalKeyId {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl fmt::Debug for LocalKeyId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("LocalKeyId").field(&hex::encode(&self.0)).finish()
+    }
+}
 
 /// X.509 certificate wrapper
 #[derive(Clone, PartialEq, Eq)]
@@ -53,7 +136,7 @@ impl Certificate {
 impl fmt::Debug for Certificate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Certificate")
-            .field("data", &"<CERT>")
+            .field("data", &"<X.509>")
             .field("subject", &self.subject)
             .field("issuer", &self.issuer)
             .finish()
@@ -63,39 +146,38 @@ impl fmt::Debug for Certificate {
 /// PrivateKeyChain represents a private key and a certificate chain
 #[derive(Clone, PartialEq, Eq)]
 pub struct PrivateKeyChain {
-    pub(crate) key: Vec<u8>,
-    pub(crate) local_key_id: Vec<u8>,
-    pub(crate) chain: Vec<Certificate>,
+    pub(crate) key: PrivateKey,
+    pub(crate) local_key_id: LocalKeyId,
+    pub(crate) certs: Vec<Certificate>,
 }
 
 impl PrivateKeyChain {
-    /// Creates a new keychain with a given key data, key id and a list of certificates.
+    /// Creates a new keychain with a given key id, private key and a list of certificates.
     /// The leaf (entity) certificate must be the first in the list, and the root certificate must be the last.
-    pub fn new<K, D, I>(key: K, local_key_id: D, chain: I) -> Self
+    pub fn new<K, I>(local_key_id: K, key: PrivateKey, certs: I) -> Self
     where
-        K: AsRef<[u8]>,
-        D: AsRef<[u8]>,
+        K: Into<LocalKeyId>,
         I: IntoIterator<Item = Certificate>,
     {
         Self {
-            key: key.as_ref().to_owned(),
-            local_key_id: local_key_id.as_ref().to_owned(),
-            chain: chain.into_iter().collect(),
+            key,
+            local_key_id: local_key_id.into(),
+            certs: certs.into_iter().collect(),
         }
     }
 
-    /// Get private key data
-    pub fn key(&self) -> &[u8] {
+    /// Get a private key
+    pub fn key(&self) -> &PrivateKey {
         &self.key
     }
 
-    /// Get a slice of certificates
-    pub fn chain(&self) -> &[Certificate] {
-        &self.chain
+    /// Get certificates
+    pub fn certs(&self) -> &[Certificate] {
+        &self.certs
     }
 
     /// Get local key id
-    pub fn local_key_id(&self) -> &[u8] {
+    pub fn local_key_id(&self) -> &LocalKeyId {
         &self.local_key_id
     }
 }
@@ -103,8 +185,8 @@ impl PrivateKeyChain {
 impl fmt::Debug for PrivateKeyChain {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PrivateKeyChain")
-            .field("key", &"<KEY>")
-            .field("chain", &self.chain)
+            .field("key", &self.key)
+            .field("certs", &self.certs)
             .field("local_key_id", &hex::encode(&self.local_key_id))
             .finish()
     }
@@ -182,7 +264,7 @@ impl KeyStore {
         let find_issuer = |issuer: &str| parsed_certs.iter().find(|c| c.cert.subject == issuer && !c.trusted);
 
         for key in parsed_keys {
-            if let Some(mut entry) = find_cert_by_key(&key.key.local_key_id) {
+            if let Some(mut entry) = find_cert_by_key(key.key.local_key_id.as_ref()) {
                 let alias = key
                     .friendly_name
                     .as_deref()
@@ -191,7 +273,7 @@ impl KeyStore {
                 let mut key_chain = PrivateKeyChain {
                     key: key.key.key,
                     local_key_id: key.key.local_key_id,
-                    chain: vec![entry.cert.clone()],
+                    certs: vec![entry.cert.clone()],
                 };
 
                 let leaf_cert = &entry.cert;
@@ -199,7 +281,7 @@ impl KeyStore {
                 while let Some(issuer) = find_issuer(&entry.cert.issuer) {
                     // Avoid duplication of self-signed certs.
                     if issuer.cert.subject != leaf_cert.subject {
-                        key_chain.chain.push(issuer.cert.clone());
+                        key_chain.certs.push(issuer.cert.clone());
                     }
                     if issuer.cert.issuer == issuer.cert.subject {
                         break;
@@ -368,10 +450,10 @@ impl Pkcs12Writer<'_, '_> {
             .entries
             .iter()
             .filter_map(|(_, entry)| match entry {
-                KeyStoreEntry::PrivateKeyChain(chain) => Some(chain.chain.iter().enumerate().map(|(i, c)| {
+                KeyStoreEntry::PrivateKeyChain(chain) => Some(chain.certs.iter().enumerate().map(|(i, c)| {
                     (
                         if i == 0 {
-                            Some(chain.local_key_id.as_slice())
+                            Some(chain.local_key_id.as_ref())
                         } else {
                             None
                         },

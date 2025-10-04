@@ -1,7 +1,7 @@
 [package]
 name = "p12-keystore"
 description = "Convenient API to work with PKCS#12 files"
-version = "0.2.0"
+version = "0.3.0-dev"
 authors = ["Dmitry Pankratov <dmitry@pankratov.net>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/ancwrd1/p12-keystore"
@@ -16,6 +16,7 @@ pbes1 = ["dep:cbc", "dep:rc2", "dep:des"]
 
 [dependencies]
 pkcs5 = { version = "0.7", features = ["alloc", "pbes2"] }
+pkcs8 = "0.10"
 pkcs12 = { version = "0.1", features = ["kdf"] }
 cms = "0.2"
 der = { version = "0.7", features = ["std", "derive"] }
