@@ -4,7 +4,7 @@ use der::oid::ObjectIdentifier;
 use rand::{RngCore, TryRngCore, rngs::OsRng};
 
 use crate::{
-    keystore::LocalKeyId,
+    LocalKeyId,
     oid::{
         AES_128_CBC_KEY_OID, AES_192_CBC_KEY_OID, AES_256_CBC_KEY_OID, AES_GROUP_KEY_OID, BLOWFISH_KEY_OID,
         CAMELIA_KEY_OID, DES_CBC_KEY_OID, DES_EDE3_CBC_KEY_OID, HMAC_SHA1_KEY_OID, HMAC_SHA224_KEY_OID,
@@ -323,11 +323,14 @@ impl fmt::Debug for Secret {
 
 #[cfg(test)]
 mod tests {
-    use crate::keystore::LocalKeyId;
-    use crate::oid::*;
-    use crate::secret::{Secret, SecretKeyBuilderError, SecretKeyType};
     use der::oid::ObjectIdentifier;
     use rand::rngs::ThreadRng;
+
+    use crate::{
+        LocalKeyId,
+        oid::*,
+        secret::{Secret, SecretKeyBuilderError, SecretKeyType},
+    };
 
     #[test]
     fn test_from_oid_str() {

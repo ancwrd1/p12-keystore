@@ -25,10 +25,12 @@ use rand::random;
 use sha1::Sha1;
 use sha2::Sha256;
 
-use crate::{
+pub(crate) use crate::{
     Result,
+    cert::Certificate,
     error::Error,
-    keystore::{Certificate, EncryptionAlgorithm, MacAlgorithm, PrivateKey, PrivateKeyChain},
+    keychain::{PrivateKey, PrivateKeyChain},
+    keystore::{EncryptionAlgorithm, MacAlgorithm},
     oid::{self, PKCS_12_PKCS8_KEY_BAG_OID},
     secret::{Secret, SecretKeyType},
 };

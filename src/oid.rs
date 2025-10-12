@@ -1,4 +1,4 @@
-use der::asn1::ObjectIdentifier;
+use der::oid::ObjectIdentifier;
 
 pub const FRIENDLY_NAME_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.9.20");
 pub const LOCAL_KEY_ID_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.9.21");
