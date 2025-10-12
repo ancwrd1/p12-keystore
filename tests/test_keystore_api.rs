@@ -169,7 +169,7 @@ fn test_keystore_api() {
 
     new_store.add_entry("c1", KeyStoreEntry::Certificate(cert.clone()));
     new_store.add_entry("c2", KeyStoreEntry::Certificate(cert.clone()));
-    assert_eq!(new_store.entries_count(), 2);
+    assert_eq!(new_store.entries_len(), 2);
     assert_eq!(new_store.entries().collect::<Vec<_>>().len(), 2);
 
     new_store.delete_entry("c1");
@@ -211,7 +211,7 @@ fn test_keystore_api_with_aes_key() {
 
     let keystore_with_aes_key = keystore_with_aes_key.unwrap();
 
-    assert_eq!(13, keystore_with_aes_key.entries_count());
+    assert_eq!(13, keystore_with_aes_key.entries_len());
 
     for (name, oid, local_key_id, key) in TEST_ENTRIES {
         if let Some(entry) = keystore_with_aes_key.entry(name) {
@@ -238,7 +238,7 @@ fn test_keystore_read_write_copy() {
         let store_data = keystore_with_keys.writer("welcome1").write().unwrap();
 
         let keystore_with_keys_copy = KeyStore::from_pkcs12(&store_data, "welcome1").unwrap();
-        assert_eq!(13, keystore_with_keys_copy.entries_count());
+        assert_eq!(13, keystore_with_keys_copy.entries_len());
     }
 }
 
@@ -250,5 +250,5 @@ fn test_keystore_create() {
     let store_data = keystore.writer("welcome1").write().unwrap();
 
     let keystore_with_keys_copy = KeyStore::from_pkcs12(&store_data, "welcome1").unwrap();
-    assert_eq!(1, keystore_with_keys_copy.entries_count());
+    assert_eq!(1, keystore_with_keys_copy.entries_len());
 }

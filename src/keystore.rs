@@ -29,6 +29,14 @@ pub enum KeyStoreEntry {
 /// Keystore entries iterator
 pub struct Entries<'a> {
     iter: Iter<'a, String, KeyStoreEntry>,
+    len: usize,
+}
+
+impl Entries<'_> {
+    /// Returns a total number of entries
+    pub fn len(&self) -> usize {
+        self.len
+    }
 }
 
 impl<'a> Iterator for Entries<'a> {
@@ -153,7 +161,10 @@ impl KeyStore {
     /// Get entries iterator
     pub fn entries(&self) -> Entries<'_> {
         let iter = self.entries.iter();
-        Entries { iter }
+        Entries {
+            iter,
+            len: self.entries.len(),
+        }
     }
 
     /// Get an entry for a given alias
@@ -162,7 +173,7 @@ impl KeyStore {
     }
 
     /// Get entries count in the keystore
-    pub fn entries_count(&self) -> usize {
+    pub fn entries_len(&self) -> usize {
         self.entries.len()
     }
 
@@ -190,8 +201,7 @@ impl KeyStore {
     pub fn private_key_chain(&self) -> Option<(&str, &PrivateKeyChain)> {
         self.entries().find_map(|(alias, entry)| match entry {
             KeyStoreEntry::PrivateKeyChain(chain) => Some((alias.as_str(), chain)),
-            KeyStoreEntry::Certificate(_) => None,
-            KeyStoreEntry::Secret(_) => None,
+            _ => None,
         })
     }
 }
@@ -206,7 +216,7 @@ pub enum EncryptionAlgorithm {
 }
 
 impl EncryptionAlgorithm {
-    pub(crate) fn as_oid(&self) -> ObjectIdentifier {
+    pub(crate) fn to_oid(self) -> ObjectIdentifier {
         match self {
             EncryptionAlgorithm::PbeWithHmacSha256AndAes256 => oid::PBES2_OID,
             EncryptionAlgorithm::PbeWithShaAnd40BitRc4Cbc => oid::PBE_WITH_SHA_AND_40BIT_RC2_CBC_OID,

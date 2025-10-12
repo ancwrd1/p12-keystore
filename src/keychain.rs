@@ -3,7 +3,47 @@ use std::fmt;
 use der::oid::ObjectIdentifier;
 use pkcs8::PrivateKeyInfo;
 
-use crate::{LocalKeyId, Result, cert::Certificate, error::Error};
+use crate::{Result, cert::Certificate, error::Error};
+
+/// Wrapper for local key id
+#[derive(Clone, PartialEq, Eq)]
+pub struct LocalKeyId(pub Vec<u8>);
+
+impl From<Vec<u8>> for LocalKeyId {
+    fn from(value: Vec<u8>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<&[u8]> for LocalKeyId {
+    fn from(value: &[u8]) -> Self {
+        Self(value.to_vec())
+    }
+}
+
+impl From<&str> for LocalKeyId {
+    fn from(value: &str) -> Self {
+        Self(value.as_bytes().to_vec())
+    }
+}
+
+impl From<String> for LocalKeyId {
+    fn from(value: String) -> Self {
+        Self(value.into())
+    }
+}
+
+impl AsRef<[u8]> for LocalKeyId {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl fmt::Debug for LocalKeyId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("LocalKeyId").field(&hex::encode(&self.0)).finish()
+    }
+}
 
 /// PKCS#8 private key wrapper
 #[derive(Clone, PartialEq, Eq)]

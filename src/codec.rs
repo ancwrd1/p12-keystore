@@ -31,7 +31,7 @@ pub(crate) use crate::{
     error::Error,
     keychain::{PrivateKey, PrivateKeyChain},
     keystore::{EncryptionAlgorithm, MacAlgorithm},
-    oid::{self, PKCS_12_PKCS8_KEY_BAG_OID},
+    oid,
     secret::{Secret, SecretKeyType},
 };
 #[cfg(feature = "pbes1")]
@@ -168,7 +168,7 @@ fn encrypt(
                 .map_err(|e| Error::Pkcs5Error(format!("{e}")))?;
 
             let alg_id = AlgorithmIdentifierOwned {
-                oid: alg.as_oid(),
+                oid: alg.to_oid(),
                 parameters: Some(Any::from_der(&params.to_der()?)?),
             };
 
@@ -178,7 +178,7 @@ fn encrypt(
         EncryptionAlgorithm::PbeWithShaAnd40BitRc4Cbc | EncryptionAlgorithm::PbeWithShaAnd3KeyTripleDesCbc => {
             let salt: [u8; 20] = random();
             let encrypted =
-                Pbes1::new(alg.as_oid(), &salt, iterations, PbeMode::Encrypt).encrypt_decrypt(data, password)?;
+                Pbes1::new(alg.to_oid(), &salt, iterations, PbeMode::Encrypt).encrypt_decrypt(data, password)?;
 
             let mut buf = vec![0u8; 64];
             let mut writer = SliceWriter::new(&mut buf);
@@ -192,7 +192,7 @@ fn encrypt(
             let params = writer.finish()?;
 
             let alg_id = AlgorithmIdentifierOwned {
-                oid: alg.as_oid(),
+                oid: alg.to_oid(),
                 parameters: Some(Any::from_der(params)?),
             };
             Ok((alg_id, encrypted))
@@ -422,7 +422,7 @@ pub fn secret_to_safe_bag(
     let encrypted_key_info_os = OctetString::new(encrypted_key_info.to_der()?)?;
 
     let secret_bag = SecretBag {
-        object_identifier: PKCS_12_PKCS8_KEY_BAG_OID,
+        object_identifier: oid::PKCS_12_PKCS8_KEY_BAG_OID,
         encrypted_private_key_info: encrypted_key_info_os,
         bag_attributes: None,
     };
@@ -471,7 +471,7 @@ pub fn private_key_to_safe_bag(
     .to_der()?;
 
     Ok(SafeBag {
-        bag_id: PKCS_12_PKCS8_KEY_BAG_OID,
+        bag_id: oid::PKCS_12_PKCS8_KEY_BAG_OID,
         bag_value: pk_info,
         bag_attributes: Some(bag_attributes),
     })

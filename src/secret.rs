@@ -3,14 +3,7 @@ use std::{fmt, str::FromStr, time::UNIX_EPOCH};
 use der::oid::ObjectIdentifier;
 use rand::{RngCore, TryRngCore, rngs::OsRng};
 
-use crate::{
-    LocalKeyId,
-    oid::{
-        AES_128_CBC_KEY_OID, AES_192_CBC_KEY_OID, AES_256_CBC_KEY_OID, AES_GROUP_KEY_OID, BLOWFISH_KEY_OID,
-        CAMELIA_KEY_OID, DES_CBC_KEY_OID, DES_EDE3_CBC_KEY_OID, HMAC_SHA1_KEY_OID, HMAC_SHA224_KEY_OID,
-        HMAC_SHA256_KEY_OID, HMAC_SHA384_KEY_OID, HMAC_SHA512_KEY_OID, RC2_CBC_KEY_OID, RC4_KEY_OID,
-    },
-};
+use crate::{LocalKeyId, oid};
 
 /// Holds a secret key of a given type.
 #[derive(Clone, PartialEq, Eq)]
@@ -32,7 +25,7 @@ impl Secret {
         self.key_type
     }
 
-    /// gets the local_key_id as bytes
+    /// gets the local_key_id
     pub fn local_key_id(&self) -> &LocalKeyId {
         &self.local_key_id
     }
@@ -248,21 +241,21 @@ impl SecretKeyType {
     /// Builds a `SecretKeyType` from an `ObjectIdentifier`
     pub fn from_oid(oid: &ObjectIdentifier) -> Self {
         match *oid {
-            AES_GROUP_KEY_OID => SecretKeyType::Aes,
-            AES_128_CBC_KEY_OID => SecretKeyType::Aes128Cbc,
-            AES_192_CBC_KEY_OID => SecretKeyType::Aes192Cbc,
-            AES_256_CBC_KEY_OID => SecretKeyType::Aes256Cbc,
-            DES_CBC_KEY_OID => SecretKeyType::DesCbc,
-            DES_EDE3_CBC_KEY_OID => SecretKeyType::DesEde3Cbc,
-            BLOWFISH_KEY_OID => SecretKeyType::Blowfish,
-            RC2_CBC_KEY_OID => SecretKeyType::Rc2Cbc,
-            RC4_KEY_OID => SecretKeyType::Rc4,
-            CAMELIA_KEY_OID => SecretKeyType::Camelia,
-            HMAC_SHA1_KEY_OID => SecretKeyType::HmacSha1,
-            HMAC_SHA224_KEY_OID => SecretKeyType::HmacSha224,
-            HMAC_SHA256_KEY_OID => SecretKeyType::HmacSha256,
-            HMAC_SHA384_KEY_OID => SecretKeyType::HmacSha384,
-            HMAC_SHA512_KEY_OID => SecretKeyType::HmacSha512,
+            oid::AES_GROUP_KEY_OID => SecretKeyType::Aes,
+            oid::AES_128_CBC_KEY_OID => SecretKeyType::Aes128Cbc,
+            oid::AES_192_CBC_KEY_OID => SecretKeyType::Aes192Cbc,
+            oid::AES_256_CBC_KEY_OID => SecretKeyType::Aes256Cbc,
+            oid::DES_CBC_KEY_OID => SecretKeyType::DesCbc,
+            oid::DES_EDE3_CBC_KEY_OID => SecretKeyType::DesEde3Cbc,
+            oid::BLOWFISH_KEY_OID => SecretKeyType::Blowfish,
+            oid::RC2_CBC_KEY_OID => SecretKeyType::Rc2Cbc,
+            oid::RC4_KEY_OID => SecretKeyType::Rc4,
+            oid::CAMELIA_KEY_OID => SecretKeyType::Camelia,
+            oid::HMAC_SHA1_KEY_OID => SecretKeyType::HmacSha1,
+            oid::HMAC_SHA224_KEY_OID => SecretKeyType::HmacSha224,
+            oid::HMAC_SHA256_KEY_OID => SecretKeyType::HmacSha256,
+            oid::HMAC_SHA384_KEY_OID => SecretKeyType::HmacSha384,
+            oid::HMAC_SHA512_KEY_OID => SecretKeyType::HmacSha512,
             _ => SecretKeyType::Unknown(*oid),
         }
     }
@@ -270,21 +263,21 @@ impl SecretKeyType {
     /// Return the `ObjectIdentifier` for a `SecretKeyType`
     pub fn to_oid(&self) -> ObjectIdentifier {
         match self {
-            SecretKeyType::Aes => AES_GROUP_KEY_OID,
-            SecretKeyType::Aes128Cbc => AES_128_CBC_KEY_OID,
-            SecretKeyType::Aes192Cbc => AES_192_CBC_KEY_OID,
-            SecretKeyType::Aes256Cbc => AES_256_CBC_KEY_OID,
-            SecretKeyType::DesCbc => DES_CBC_KEY_OID,
-            SecretKeyType::DesEde3Cbc => DES_EDE3_CBC_KEY_OID,
-            SecretKeyType::Blowfish => BLOWFISH_KEY_OID,
-            SecretKeyType::Rc2Cbc => RC2_CBC_KEY_OID,
-            SecretKeyType::Rc4 => RC4_KEY_OID,
-            SecretKeyType::Camelia => CAMELIA_KEY_OID,
-            SecretKeyType::HmacSha1 => HMAC_SHA1_KEY_OID,
-            SecretKeyType::HmacSha224 => HMAC_SHA224_KEY_OID,
-            SecretKeyType::HmacSha256 => HMAC_SHA256_KEY_OID,
-            SecretKeyType::HmacSha384 => HMAC_SHA384_KEY_OID,
-            SecretKeyType::HmacSha512 => HMAC_SHA512_KEY_OID,
+            SecretKeyType::Aes => oid::AES_GROUP_KEY_OID,
+            SecretKeyType::Aes128Cbc => oid::AES_128_CBC_KEY_OID,
+            SecretKeyType::Aes192Cbc => oid::AES_192_CBC_KEY_OID,
+            SecretKeyType::Aes256Cbc => oid::AES_256_CBC_KEY_OID,
+            SecretKeyType::DesCbc => oid::DES_CBC_KEY_OID,
+            SecretKeyType::DesEde3Cbc => oid::DES_EDE3_CBC_KEY_OID,
+            SecretKeyType::Blowfish => oid::BLOWFISH_KEY_OID,
+            SecretKeyType::Rc2Cbc => oid::RC2_CBC_KEY_OID,
+            SecretKeyType::Rc4 => oid::RC4_KEY_OID,
+            SecretKeyType::Camelia => oid::CAMELIA_KEY_OID,
+            SecretKeyType::HmacSha1 => oid::HMAC_SHA1_KEY_OID,
+            SecretKeyType::HmacSha224 => oid::HMAC_SHA224_KEY_OID,
+            SecretKeyType::HmacSha256 => oid::HMAC_SHA256_KEY_OID,
+            SecretKeyType::HmacSha384 => oid::HMAC_SHA384_KEY_OID,
+            SecretKeyType::HmacSha512 => oid::HMAC_SHA512_KEY_OID,
             SecretKeyType::Unknown(oid) => *oid,
         }
     }
