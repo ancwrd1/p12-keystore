@@ -145,9 +145,9 @@ impl KeyStore {
         Ok(keystore)
     }
 
-    /// Create keystore writer with a given password to use for data encryption
+    /// Create a keystore writer with a given password to use for data encryption
     pub fn writer<'a, 'b>(&'a self, password: &'b str) -> Pkcs12Writer<'a, 'b> {
-        // default values are taken from JVM java.security config file
+        // default values are taken from the JVM java.security config file
         Pkcs12Writer {
             keystore: self,
             password,
@@ -177,7 +177,7 @@ impl KeyStore {
         self.entries.len()
     }
 
-    /// Add new entry to the keystore
+    /// Add a new entry to the keystore
     pub fn add_entry(&mut self, alias: &str, entry: KeyStoreEntry) {
         self.entries.insert(alias.to_owned(), entry);
     }
@@ -244,13 +244,13 @@ pub struct Pkcs12Writer<'a, 'b> {
 }
 
 impl Pkcs12Writer<'_, '_> {
-    /// Set encryption algorithm. Default is [EncryptionAlgorithm::PbeWithHmacSha256AndAes256]
+    /// Set an encryption algorithm. Default is [EncryptionAlgorithm::PbeWithHmacSha256AndAes256]
     pub fn encryption_algorithm(mut self, algorithm: EncryptionAlgorithm) -> Self {
         self.encryption_algorithm = algorithm;
         self
     }
 
-    /// Set encryption iterations. Default is 10000
+    /// Set the number of iterations for encryption key derivation. Default is 10,000.
     pub fn encryption_iterations(mut self, iterations: u64) -> Self {
         self.encryption_iterations = iterations;
         self
@@ -262,7 +262,7 @@ impl Pkcs12Writer<'_, '_> {
         self
     }
 
-    /// Set MAC iterations. Default is 10000
+    /// Set the number of iterations for MAC key derivation. Default is 10,000.
     pub fn mac_iterations(mut self, iterations: u64) -> Self {
         self.mac_iterations = iterations;
         self

@@ -5,7 +5,7 @@ use pkcs8::PrivateKeyInfo;
 
 use crate::{Result, cert::Certificate, error::Error};
 
-/// Wrapper for local key id
+/// Wrapper for a local key id
 #[derive(Clone, PartialEq, Eq)]
 pub struct LocalKeyId(pub Vec<u8>);
 
