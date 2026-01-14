@@ -1,7 +1,7 @@
 use std::fmt;
 
 use der::oid::ObjectIdentifier;
-use pkcs8::PrivateKeyInfo;
+use pkcs8::PrivateKeyInfoRef;
 
 use crate::{Result, cert::Certificate, error::Error};
 
@@ -55,7 +55,7 @@ pub struct PrivateKey {
 impl PrivateKey {
     /// Parses a PKCS#8 private key encoded in DER format and constructs a new instance of the struct.
     pub fn from_der(data: &[u8]) -> Result<Self> {
-        let info: PrivateKeyInfo = data.try_into().map_err(|_| Error::InvalidPrivateKey)?;
+        let info: PrivateKeyInfoRef = data.try_into().map_err(|_| Error::InvalidPrivateKey)?;
         Ok(Self {
             data: data.to_vec(),
             oid: info.algorithm.oid,

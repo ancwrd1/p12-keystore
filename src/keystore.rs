@@ -4,7 +4,7 @@ use cms::content_info::ContentInfo;
 use der::{Any, Decode, Encode, asn1::OctetString, oid::ObjectIdentifier};
 use hex::ToHex;
 use pkcs12::{
-    authenticated_safe::AuthenticatedSafe,
+    AuthenticatedSafe,
     pfx::{Pfx, Version},
 };
 

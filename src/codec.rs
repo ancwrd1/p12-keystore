@@ -11,13 +11,10 @@ use der::{
     Any, Decode, Encode, Sequence,
     asn1::{BmpString, ContextSpecific, ObjectIdentifier, OctetString, OctetStringRef, SetOfVec},
 };
-use hmac::{Mac, digest::Digest};
+use hmac::{KeyInit, Mac, digest::Digest};
 use pkcs5::pbes2;
 use pkcs12::{
-    cert_type::CertBag,
-    digest_info::DigestInfo,
-    kdf,
-    mac_data::MacData,
+    CertBag, DigestInfo, MacData, kdf,
     pbe_params::EncryptedPrivateKeyInfo,
     safe_bag::{Pkcs8Version, PrivateKeyInfo, SafeBag, SafeContents},
 };
@@ -139,9 +136,9 @@ fn decrypt(alg: &AlgorithmIdentifierOwned, data: &[u8], password: &str) -> Resul
 
             let mut reader = SliceReader::new(&params)?;
             let (salt, iterations) = reader.sequence(|reader| {
-                let salt = OctetStringRef::decode(reader)?.as_bytes().to_vec();
+                let salt = OctetString::decode(reader)?.as_bytes().to_vec();
                 let iterations: u64 = reader.decode()?;
-                Ok((salt, iterations))
+                Ok::<_, Error>((salt, iterations))
             })?;
 
             Pbes1::new(alg.oid, &salt, iterations, PbeMode::Decrypt).encrypt_decrypt(data, password)
@@ -160,7 +157,7 @@ fn encrypt(
         EncryptionAlgorithm::PbeWithHmacSha256AndAes256 => {
             let salt: [u8; 32] = random();
             let iv: [u8; 16] = random();
-            let params = pbes2::Parameters::pbkdf2_sha256_aes256cbc(iterations as _, &salt, &iv)
+            let params = pbes2::Parameters::pbkdf2_sha256_aes256cbc(iterations as _, &salt, iv)
                 .map_err(|e| Error::Pkcs5Error(e.to_string()))?;
 
             let encrypted = params
@@ -273,7 +270,7 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
                 {
                     let key = Secret {
                         key_type: SecretKeyType::from_oid(&priv_key.algorithm.oid),
-                        key: priv_key.private_key.into_bytes(),
+                        key: priv_key.private_key.into_bytes().into(),
                         local_key_id: local_key_id.into(),
                     };
                     secrets.push(ParsedSecret { friendly_name, key });
@@ -624,7 +621,7 @@ mod tests {
 
         let private_key_info = bag.private_key_info(TEST_STORE_PASSWORD).unwrap();
 
-        let private_key_value = private_key_info.private_key.into_bytes();
+        let private_key_value = private_key_info.private_key.as_bytes();
         assert_eq!(secret.key(), private_key_value);
         assert_eq!(secret.key().len(), private_key_value.len());
     }
