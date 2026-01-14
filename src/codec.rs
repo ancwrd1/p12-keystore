@@ -21,6 +21,11 @@ use pkcs12::{
 use rand::random;
 use sha1::Sha1;
 use sha2::Sha256;
+#[cfg(feature = "pbes1")]
+use {
+    crate::pbes1::{PbeMode, Pbes1},
+    der::{Reader, SliceReader, SliceWriter},
+};
 
 pub(crate) use crate::{
     Result,
@@ -30,11 +35,6 @@ pub(crate) use crate::{
     keystore::{EncryptionAlgorithm, MacAlgorithm},
     oid,
     secret::{Secret, SecretKeyType},
-};
-#[cfg(feature = "pbes1")]
-use {
-    crate::pbes1::{PbeMode, Pbes1},
-    der::{Reader, SliceReader, SliceWriter},
 };
 
 pub struct ParsedKeyChain {
@@ -548,15 +548,16 @@ pub fn compute_mac(data: &[u8], algorithm: MacAlgorithm, iterations: u64, passwo
 
 #[cfg(test)]
 mod tests {
-    use crate::EncryptionAlgorithm;
-    use crate::codec::{SecretBag, secret_to_safe_bag};
-    use crate::oid::BLOWFISH_KEY_OID;
-    use crate::secret::Secret;
-    use crate::secret::SecretKeyType::Aes;
-    use base64::Engine;
-    use base64::engine::general_purpose::STANDARD;
+    use base64::{Engine, engine::general_purpose::STANDARD};
     use der::{Any, Decode, Encode};
     use pkcs12::safe_bag::SafeBag;
+
+    use crate::{
+        EncryptionAlgorithm,
+        codec::{SecretBag, secret_to_safe_bag},
+        oid::BLOWFISH_KEY_OID,
+        secret::{Secret, SecretKeyType::Aes},
+    };
 
     // Testdata for writing the full SecretBag struct
     const SECRET_BAG_DATA: &str = "oIGzMIGwBgsqhkiG9w0BDAoBAqCBoASBnTCBmjBmBgkqhkiG9w0BBQ0wWTA4BgkqhkiG9w0BBQwwKwQUnuKEvUWqBU1bJE7g5hYeIU3zsmYCAicQAgEgMAwGCCqGSIb3DQIJBQAwHQYJYIZIAWUDBAEqBBBEitwx8ZcwYypT521bjuv8BDAARNFyg3PJsKUGvngARYN+vtsXHVXEXLOlghj4awwBVf2BW1hZx5Zow+7CF6b/YE4=";

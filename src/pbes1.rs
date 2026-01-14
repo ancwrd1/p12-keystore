@@ -1,5 +1,6 @@
 use cbc::cipher::{
-    BlockCipher, BlockDecrypt, BlockDecryptMut, BlockEncrypt, BlockEncryptMut, KeyInit, KeyIvInit, block_padding::Pkcs7,
+    BlockCipherDecrypt, BlockCipherEncrypt, BlockModeDecrypt, BlockModeEncrypt, KeyInit, KeyIvInit,
+    block_padding::Pkcs7,
 };
 use der::oid::ObjectIdentifier;
 use des::TdesEde3;
@@ -34,7 +35,7 @@ impl<'a> Pbes1<'a> {
 
     fn cbc<T>(&self, data: &[u8], password: &str, size: usize) -> Result<Vec<u8>>
     where
-        T: KeyInit + Sized + BlockCipher + BlockEncrypt + BlockDecrypt,
+        T: KeyInit + Sized + BlockCipherDecrypt + BlockCipherEncrypt,
     {
         let key = kdf::derive_key_utf8::<Sha1>(
             password,
@@ -48,11 +49,11 @@ impl<'a> Pbes1<'a> {
 
         if self.mode == PbeMode::Encrypt {
             let cipher = cbc::Encryptor::<T>::new_from_slices(&key, &iv).map_err(|_| Error::InvalidLength)?;
-            Ok(cipher.encrypt_padded_vec_mut::<Pkcs7>(data))
+            Ok(cipher.encrypt_padded_vec::<Pkcs7>(data))
         } else {
             let cipher = cbc::Decryptor::<T>::new_from_slices(&key, &iv).map_err(|_| Error::InvalidLength)?;
             Ok(cipher
-                .decrypt_padded_vec_mut::<Pkcs7>(data)
+                .decrypt_padded_vec::<Pkcs7>(data)
                 .map_err(|_| Error::UnpadError)?)
         }
     }
