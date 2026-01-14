@@ -31,7 +31,7 @@ impl Secret {
     }
 
     /// The builder to build a secret of a given type. If the type has no length assigned,
-    /// it needs also a .with_length(<bytes>).
+    /// it needs also a .with_length(N).
     /// # Example:
     /// ```
     /// use p12_keystore::secret::Secret;
