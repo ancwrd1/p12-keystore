@@ -35,7 +35,7 @@ impl<'a> Pbes1<'a> {
 
     fn cbc<T>(&self, data: &[u8], password: &str, size: usize) -> Result<Vec<u8>>
     where
-        T: KeyInit + Sized + BlockCipherDecrypt + BlockCipherEncrypt,
+        T: KeyInit + BlockCipherDecrypt + BlockCipherEncrypt,
     {
         let key = kdf::derive_key_utf8::<Sha1>(
             password,
