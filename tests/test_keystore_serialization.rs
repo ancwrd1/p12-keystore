@@ -5,6 +5,7 @@ const PBES2_KEYSTORE: &[u8] = include_bytes!("../tests/assets/pbes2-keystore.p12
 const PBES1_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pbes1-truststore.p12");
 const PBES2_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pbes2-truststore.p12");
 const PFX_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pfx-ed25519.pfx");
+const CLEAR_TWOCERT: &[u8] = include_bytes!("../tests/assets/clear_twocert.p12");
 
 const PASSWORD: &str = "changeit";
 const ITERATIONS: u64 = 1000;
@@ -58,6 +59,23 @@ fn test_parse_pbes1_truststore() {
 #[test]
 fn test_parse_pbes2_truststore() {
     common_read_test(PBES2_TRUSTSTORE);
+}
+
+#[test]
+fn test_parse_clear_twocerts_bundle() {
+    let keystore = KeyStore::from_pkcs12_bundle(CLEAR_TWOCERT, "").unwrap();
+
+    for e in keystore.entries() {
+        println!("{}: {:#?}", e.0, e.1)
+    }
+
+    println!("Keystore coucoucoucou");
+
+    assert_eq!(
+        3,
+        keystore.entries().len(),
+        "both certificates must be present + the key"
+    );
 }
 
 #[test]
