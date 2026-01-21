@@ -249,11 +249,6 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
                     return Err(Error::UnsupportedCertificateType);
                 }
                 let cert = Certificate::from_der(cs.value.cert_value.as_bytes())?;
-                println!(
-                    "Pushed lki:{:?} and fn:{:?}",
-                    local_key_id.as_ref(),
-                    friendly_name.as_ref()
-                );
                 certs.push(ParsedCertificate {
                     friendly_name,
                     local_key_id,

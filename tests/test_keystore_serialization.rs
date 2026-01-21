@@ -69,8 +69,6 @@ fn test_parse_clear_twocerts_bundle() {
         println!("{}: {:#?}", e.0, e.1)
     }
 
-    println!("Keystore coucoucoucou");
-
     assert_eq!(
         3,
         keystore.entries().len(),
