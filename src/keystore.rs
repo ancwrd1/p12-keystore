@@ -47,6 +47,15 @@ impl<'a> Iterator for Entries<'a> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Pkcs12ImportPolicy {
+    /// Ignore unmatched private keys and untrusted certificates
+    #[default]
+    Strict,
+    /// Try to import everything, may produce keychains without certificates
+    Relaxed,
+}
+
 /// KeyStore holds a dictionary of [KeyStoreEntry] instances indexed by aliases (names)
 #[derive(Debug, Clone, Default)]
 pub struct KeyStore {
@@ -60,18 +69,7 @@ impl KeyStore {
     }
 
     /// Parse keystore from PKCS#12 data
-    pub fn from_pkcs12(data: &[u8], password: &str) -> Result<Self> {
-        Self::from_pkcs12_internal(data, password, true)
-    }
-
-    /// Parse keystore from PKCS#12 data as a simple bundle without linking keys and certificates.
-    /// All keys, certificates, and secrets are stored as independent entries.
-    /// Keys will have empty certificate chains, and all certificates are stored separately.
-    pub fn from_pkcs12_bundle(data: &[u8], password: &str) -> Result<Self> {
-        Self::from_pkcs12_internal(data, password, false)
-    }
-
-    fn from_pkcs12_internal(data: &[u8], password: &str, link_keys_and_certs: bool) -> Result<Self> {
+    pub fn from_pkcs12(data: &[u8], password: &str, policy: Pkcs12ImportPolicy) -> Result<Self> {
         let pfx = Pfx::from_der(data)?;
 
         if pfx.version != Version::V3 {
@@ -101,69 +99,72 @@ impl KeyStore {
             parsed_secrets.extend(secrets);
         }
 
-        if link_keys_and_certs {
-            let find_cert_by_key = |key: &[u8]| {
-                parsed_certs
-                    .iter()
-                    .find(|c| c.local_key_id.as_ref().is_some_and(|k| k.as_slice() == key))
-            };
+        match policy {
+            Pkcs12ImportPolicy::Strict => {
+                let find_cert_by_key = |key: &[u8]| {
+                    parsed_certs
+                        .iter()
+                        .find(|c| c.local_key_id.as_ref().is_some_and(|k| k.as_slice() == key))
+                };
 
-            let find_issuer = |issuer: &str| parsed_certs.iter().find(|c| c.cert.subject == issuer && !c.trusted);
+                let find_issuer = |issuer: &str| parsed_certs.iter().find(|c| c.cert.subject == issuer && !c.trusted);
 
-            for key in parsed_keys {
-                if let Some(mut entry) = find_cert_by_key(key.key.local_key_id.as_ref()) {
-                    let alias = key
-                        .friendly_name
-                        .as_deref()
-                        .unwrap_or_else(|| entry.cert.subject.as_ref());
+                for key in parsed_keys {
+                    if let Some(mut entry) = find_cert_by_key(key.key.local_key_id.as_ref()) {
+                        let alias = key
+                            .friendly_name
+                            .as_deref()
+                            .unwrap_or_else(|| entry.cert.subject.as_ref());
 
-                    let mut key_chain = PrivateKeyChain {
-                        key: key.key.key,
-                        local_key_id: key.key.local_key_id,
-                        certs: vec![entry.cert.clone()],
-                    };
+                        let mut key_chain = PrivateKeyChain {
+                            key: key.key.key,
+                            local_key_id: key.key.local_key_id,
+                            certs: vec![entry.cert.clone()],
+                        };
 
-                    let leaf_cert = &entry.cert;
+                        let leaf_cert = &entry.cert;
 
-                    while let Some(issuer) = find_issuer(&entry.cert.issuer) {
-                        // Avoid duplication of self-signed certs.
-                        if issuer.cert.subject != leaf_cert.subject {
-                            key_chain.certs.push(issuer.cert.clone());
+                        while let Some(issuer) = find_issuer(&entry.cert.issuer) {
+                            // Avoid duplication of self-signed certs.
+                            if issuer.cert.subject != leaf_cert.subject {
+                                key_chain.certs.push(issuer.cert.clone());
+                            }
+                            if issuer.cert.issuer == issuer.cert.subject {
+                                break;
+                            }
+                            entry = issuer;
                         }
-                        if issuer.cert.issuer == issuer.cert.subject {
-                            break;
-                        }
-                        entry = issuer;
+                        keystore.add_entry(alias, KeyStoreEntry::PrivateKeyChain(key_chain));
                     }
-                    keystore.add_entry(alias, KeyStoreEntry::PrivateKeyChain(key_chain));
+                }
+
+                for cert in parsed_certs {
+                    if cert.local_key_id.is_none() && cert.trusted {
+                        let alias = cert.friendly_name.clone().unwrap_or_else(|| cert.cert.subject.clone());
+                        keystore.add_entry(&alias, KeyStoreEntry::Certificate(cert.cert));
+                    }
                 }
             }
+            Pkcs12ImportPolicy::Relaxed => {
+                // Bundle mode: no linking, all entries may be independent
+                for key in parsed_keys {
+                    let alias = key
+                        .friendly_name
+                        .clone()
+                        .unwrap_or_else(|| key.key.local_key_id.encode_hex());
 
-            for cert in parsed_certs {
-                if cert.local_key_id.is_none() && cert.trusted {
+                    let key_chain = PrivateKeyChain {
+                        key: key.key.key,
+                        local_key_id: key.key.local_key_id,
+                        certs: vec![],
+                    };
+                    keystore.add_entry(&alias, KeyStoreEntry::PrivateKeyChain(key_chain));
+                }
+
+                for cert in parsed_certs {
                     let alias = cert.friendly_name.clone().unwrap_or_else(|| cert.cert.subject.clone());
                     keystore.add_entry(&alias, KeyStoreEntry::Certificate(cert.cert));
                 }
-            }
-        } else {
-            // Bundle mode: no linking, all entries are independent
-            for key in parsed_keys {
-                let alias = key
-                    .friendly_name
-                    .clone()
-                    .unwrap_or_else(|| key.key.local_key_id.encode_hex());
-
-                let key_chain = PrivateKeyChain {
-                    key: key.key.key,
-                    local_key_id: key.key.local_key_id,
-                    certs: vec![],
-                };
-                keystore.add_entry(&alias, KeyStoreEntry::PrivateKeyChain(key_chain));
-            }
-
-            for cert in parsed_certs {
-                let alias = cert.friendly_name.clone().unwrap_or_else(|| cert.cert.subject.clone());
-                keystore.add_entry(&alias, KeyStoreEntry::Certificate(cert.cert));
             }
         }
 

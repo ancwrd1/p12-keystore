@@ -1,4 +1,4 @@
-use p12_keystore::{EncryptionAlgorithm, KeyStore, MacAlgorithm};
+use p12_keystore::{EncryptionAlgorithm, KeyStore, MacAlgorithm, Pkcs12ImportPolicy};
 
 const PBES1_KEYSTORE: &[u8] = include_bytes!("../tests/assets/pbes1-keystore.p12");
 const PBES2_KEYSTORE: &[u8] = include_bytes!("../tests/assets/pbes2-keystore.p12");
@@ -11,7 +11,7 @@ const PASSWORD: &str = "changeit";
 const ITERATIONS: u64 = 1000;
 
 fn common_read_test(pkcs12: &[u8]) {
-    let keystore = KeyStore::from_pkcs12(pkcs12, PASSWORD).unwrap();
+    let keystore = KeyStore::from_pkcs12(pkcs12, PASSWORD, Pkcs12ImportPolicy::Strict).unwrap();
 
     for e in keystore.entries() {
         println!("{}: {:#?}", e.0, e.1);
@@ -26,7 +26,7 @@ fn common_write_test(
     mac_alg: MacAlgorithm,
     mac_iterations: u64,
 ) {
-    let keystore = KeyStore::from_pkcs12(pkcs12, PASSWORD).unwrap();
+    let keystore = KeyStore::from_pkcs12(pkcs12, PASSWORD, Pkcs12ImportPolicy::Strict).unwrap();
 
     let data = keystore
         .writer(PASSWORD)
@@ -38,7 +38,7 @@ fn common_write_test(
         .expect(name);
 
     //std::fs::write(format!("/tmp/{name}.p12"), &data).unwrap();
-    KeyStore::from_pkcs12(&data, PASSWORD).expect(name);
+    KeyStore::from_pkcs12(&data, PASSWORD, Pkcs12ImportPolicy::Strict).expect(name);
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn test_parse_pbes2_truststore() {
 
 #[test]
 fn test_parse_clear_twocerts_bundle() {
-    let keystore = KeyStore::from_pkcs12_bundle(CLEAR_TWOCERT, "").unwrap();
+    let keystore = KeyStore::from_pkcs12(CLEAR_TWOCERT, "", Pkcs12ImportPolicy::Relaxed).unwrap();
 
     for e in keystore.entries() {
         println!("{}: {:#?}", e.0, e.1)
@@ -78,7 +78,7 @@ fn test_parse_clear_twocerts_bundle() {
 
 #[test]
 fn test_parse_self_signed_pfx() {
-    let keystore = KeyStore::from_pkcs12(PFX_TRUSTSTORE, PASSWORD).unwrap();
+    let keystore = KeyStore::from_pkcs12(PFX_TRUSTSTORE, PASSWORD, Pkcs12ImportPolicy::Strict).unwrap();
 
     for e in keystore.entries() {
         println!("{}: {:#?}", e.0, e.1)

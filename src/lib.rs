@@ -40,4 +40,4 @@ pub type Result<T> = std::result::Result<T, error::Error>;
 
 pub use cert::Certificate;
 pub use keychain::{LocalKeyId, PrivateKeyChain};
-pub use keystore::{EncryptionAlgorithm, KeyStore, KeyStoreEntry, MacAlgorithm, Pkcs12Writer};
+pub use keystore::{EncryptionAlgorithm, KeyStore, KeyStoreEntry, MacAlgorithm, Pkcs12ImportPolicy, Pkcs12Writer};
