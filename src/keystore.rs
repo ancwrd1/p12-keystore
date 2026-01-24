@@ -37,6 +37,11 @@ impl Entries<'_> {
     pub fn len(&self) -> usize {
         self.len
     }
+
+    /// Returns true if there are no entries
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
 }
 
 impl<'a> Iterator for Entries<'a> {

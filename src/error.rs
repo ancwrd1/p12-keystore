@@ -21,7 +21,7 @@ pub enum Error {
     #[error("Unsupported ContentType")]
     UnsupportedContentType,
 
-    #[error("Unsupported certiticate type")]
+    #[error("Unsupported certificate type")]
     UnsupportedCertificateType,
 
     #[error(transparent)]

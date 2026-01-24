@@ -355,18 +355,8 @@ impl SecretBag {
     }
 
     pub fn from_bag_der(data: &[u8]) -> Result<SecretBag> {
-        let envelope = Any::from_der(data);
-        match envelope {
-            Ok(envelope) => {
-                let data = envelope.value();
-                let secret_bag = SecretBag::from_der(data);
-                match secret_bag {
-                    Ok(secret_bag) => Ok(secret_bag),
-                    Err(e) => Err(Error::DerError(e)),
-                }
-            }
-            Err(e) => Err(Error::DerError(e)),
-        }
+        let envelope = Any::from_der(data)?;
+        Ok(SecretBag::from_der(envelope.value())?)
     }
 }
 

@@ -207,10 +207,13 @@ impl RandomGenerator for OsRngRandomGenerator {
 }
 
 /// Error, which can be returned by the `SecretBuilder`
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, thiserror::Error)]
 pub enum SecretKeyBuilderError {
+    #[error("Key length is required but not provided")]
     MissingKeyLength,
+    #[error("Key or local key ID is missing")]
     MissingKeyOrLocalKeyId,
+    #[error("Random number generation failed")]
     RandomGenerationError,
 }
 
@@ -306,10 +309,10 @@ impl FromStr for SecretKeyType {
 /// Implements debug for formatted output
 impl fmt::Debug for Secret {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PrivateKeyChain")
+        f.debug_struct("Secret")
             .field("key_type", &self.key_type)
             .field("key", &"<KEY>")
-            .field("local_key_id", &hex::encode(&self.local_key_id))
+            .field("local_key_id", &self.local_key_id)
             .finish()
     }
 }
