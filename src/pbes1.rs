@@ -19,12 +19,12 @@ pub enum PbeMode {
 pub struct Pbes1<'a> {
     alg_oid: ObjectIdentifier,
     salt: &'a [u8],
-    iterations: u64,
+    iterations: i32,
     mode: PbeMode,
 }
 
 impl<'a> Pbes1<'a> {
-    pub fn new(alg_oid: ObjectIdentifier, salt: &'a [u8], iterations: u64, mode: PbeMode) -> Self {
+    pub fn new(alg_oid: ObjectIdentifier, salt: &'a [u8], iterations: i32, mode: PbeMode) -> Self {
         Self {
             alg_oid,
             salt,
@@ -41,7 +41,7 @@ impl<'a> Pbes1<'a> {
             password,
             self.salt,
             kdf::Pkcs12KeyType::EncryptionKey,
-            self.iterations as _,
+            self.iterations,
             size,
         )?;
 

@@ -7,7 +7,7 @@ const PBES2_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pbes2-truststore
 const PFX_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pfx-ed25519.pfx");
 
 const PASSWORD: &str = "changeit";
-const ITERATIONS: u64 = 1000;
+const ITERATIONS: u32 = 1000;
 
 fn common_read_test(pkcs12: &[u8]) {
     let keystore = KeyStore::from_pkcs12(pkcs12, PASSWORD).unwrap();
@@ -21,9 +21,9 @@ fn common_write_test(
     name: &str,
     pkcs12: &[u8],
     enc_alg: EncryptionAlgorithm,
-    enc_iterations: u64,
+    enc_iterations: u32,
     mac_alg: MacAlgorithm,
-    mac_iterations: u64,
+    mac_iterations: u32,
 ) {
     let keystore = KeyStore::from_pkcs12(pkcs12, PASSWORD).unwrap();
 

@@ -243,9 +243,9 @@ pub struct Pkcs12Writer<'a, 'b> {
     keystore: &'a KeyStore,
     password: &'b str,
     encryption_algorithm: EncryptionAlgorithm,
-    encryption_iterations: u64,
+    encryption_iterations: u32,
     mac_algorithm: MacAlgorithm,
-    mac_iterations: u64,
+    mac_iterations: u32,
 }
 
 impl Pkcs12Writer<'_, '_> {
@@ -256,7 +256,7 @@ impl Pkcs12Writer<'_, '_> {
     }
 
     /// Set the number of iterations for encryption key derivation. Default is 10,000.
-    pub fn encryption_iterations(mut self, iterations: u64) -> Self {
+    pub fn encryption_iterations(mut self, iterations: u32) -> Self {
         self.encryption_iterations = iterations;
         self
     }
@@ -268,7 +268,7 @@ impl Pkcs12Writer<'_, '_> {
     }
 
     /// Set the number of iterations for MAC key derivation. Default is 10,000.
-    pub fn mac_iterations(mut self, iterations: u64) -> Self {
+    pub fn mac_iterations(mut self, iterations: u32) -> Self {
         self.mac_iterations = iterations;
         self
     }
@@ -319,7 +319,7 @@ impl Pkcs12Writer<'_, '_> {
         let certs_safe = codec::cert_bags_to_auth_safe(
             cert_bags,
             self.encryption_algorithm,
-            self.encryption_iterations,
+            self.encryption_iterations as i32,
             self.password,
         )?;
 
@@ -336,7 +336,7 @@ impl Pkcs12Writer<'_, '_> {
                 chain,
                 alias,
                 self.encryption_algorithm,
-                self.encryption_iterations,
+                self.encryption_iterations as i32,
                 self.password,
             )?);
         }
@@ -357,7 +357,7 @@ impl Pkcs12Writer<'_, '_> {
                         secret,
                         self.encryption_algorithm,
                         alias,
-                        self.encryption_iterations,
+                        self.encryption_iterations as i32,
                         self.password,
                     );
                     Some(bag)
@@ -378,7 +378,7 @@ impl Pkcs12Writer<'_, '_> {
         let mac_data = codec::compute_mac(
             auth_safe.content.value(),
             self.mac_algorithm,
-            self.mac_iterations,
+            self.mac_iterations as i32,
             self.password,
         )?;
 

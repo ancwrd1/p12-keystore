@@ -67,7 +67,7 @@ pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()>
                 password,
                 mac_data.mac_salt.as_bytes(),
                 kdf::Pkcs12KeyType::Mac,
-                mac_data.iterations as _,
+                mac_data.iterations,
                 Sha1::output_size(),
             )?;
             let mut hmac = hmac::Hmac::<Sha1>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
@@ -80,7 +80,7 @@ pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()>
                 password,
                 mac_data.mac_salt.as_bytes(),
                 kdf::Pkcs12KeyType::Mac,
-                mac_data.iterations as _,
+                mac_data.iterations,
                 Sha256::output_size(),
             )?;
             let mut hmac = hmac::Hmac::<Sha256>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
@@ -137,7 +137,7 @@ fn decrypt(alg: &AlgorithmIdentifierOwned, data: &[u8], password: &str) -> Resul
             let mut reader = SliceReader::new(&params)?;
             let (salt, iterations) = reader.sequence(|reader| {
                 let salt = OctetString::decode(reader)?.as_bytes().to_vec();
-                let iterations: u64 = reader.decode()?;
+                let iterations: i32 = reader.decode()?;
                 Ok::<_, Error>((salt, iterations))
             })?;
 
@@ -149,7 +149,7 @@ fn decrypt(alg: &AlgorithmIdentifierOwned, data: &[u8], password: &str) -> Resul
 
 fn encrypt(
     alg: EncryptionAlgorithm,
-    iterations: u64,
+    iterations: i32,
     data: &[u8],
     password: &str,
 ) -> Result<(AlgorithmIdentifierOwned, Vec<u8>)> {
@@ -364,7 +364,7 @@ pub fn secret_to_safe_bag(
     key: &Secret,
     algorithm: EncryptionAlgorithm,
     friendly_name: &str,
-    iterations: u64,
+    iterations: i32,
     password: &str,
 ) -> Result<SafeBag> {
     let mut bag_attributes = Attributes::new();
@@ -427,7 +427,7 @@ pub fn private_key_to_safe_bag(
     key: &PrivateKeyChain,
     friendly_name: &str,
     algorithm: EncryptionAlgorithm,
-    iterations: u64,
+    iterations: i32,
     password: &str,
 ) -> Result<SafeBag> {
     let mut bag_attributes = Attributes::new();
@@ -467,7 +467,7 @@ pub fn private_key_to_safe_bag(
 pub fn cert_bags_to_auth_safe(
     bags: Vec<SafeBag>,
     algorithm: EncryptionAlgorithm,
-    iterations: u64,
+    iterations: i32,
     password: &str,
 ) -> Result<ContentInfo> {
     let data = bags.to_der()?;
@@ -496,7 +496,7 @@ pub fn key_bags_to_auth_safe(bags: Vec<SafeBag>) -> Result<ContentInfo> {
     })
 }
 
-pub fn compute_mac(data: &[u8], algorithm: MacAlgorithm, iterations: u64, password: &str) -> Result<MacData> {
+pub fn compute_mac(data: &[u8], algorithm: MacAlgorithm, iterations: i32, password: &str) -> Result<MacData> {
     let (oid, salt, digest) = match algorithm {
         MacAlgorithm::HmacSha1 => {
             let salt: [u8; 20] = random();
@@ -504,7 +504,7 @@ pub fn compute_mac(data: &[u8], algorithm: MacAlgorithm, iterations: u64, passwo
                 password,
                 &salt,
                 kdf::Pkcs12KeyType::Mac,
-                iterations as _,
+                iterations,
                 Sha1::output_size(),
             )?;
             let mut hmac = hmac::Hmac::<Sha1>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
@@ -517,7 +517,7 @@ pub fn compute_mac(data: &[u8], algorithm: MacAlgorithm, iterations: u64, passwo
                 password,
                 &salt,
                 kdf::Pkcs12KeyType::Mac,
-                iterations as _,
+                iterations,
                 Sha256::output_size(),
             )?;
             let mut hmac = hmac::Hmac::<Sha256>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
