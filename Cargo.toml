@@ -15,8 +15,8 @@ default = ["pbes1"]
 pbes1 = ["dep:cbc", "dep:rc2", "dep:des"]
 
 [dependencies]
-pkcs5 = { version = "0.8.0-rc.11", features = ["alloc", "pbes2"] }
-pkcs8 = "0.11.0-rc.8"
+pkcs5 = { version = "0.8.0-rc.13", features = ["alloc", "pbes2"] }
+pkcs8 = "0.11.0-rc.10"
 pkcs12 = { version = "0.2.0-pre.0", features = ["kdf"] }
 cms = "0.3.0-pre.1"
 der = { version = "0.8.0-rc.10", features = ["std", "derive"] }
