@@ -1,7 +1,7 @@
 extern crate core;
 
 use p12_keystore::{
-    KeyStore, KeyStoreEntry,
+    KeyStore, KeyStoreEntry, Pkcs12ImportPolicy,
     secret::{Secret, SecretKeyType},
 };
 
@@ -142,7 +142,7 @@ pub const TEST_ENTRIES: &[(&str, &str, &[u8], &[u8])] = &[
 
 #[test]
 fn test_keystore_api() {
-    let seed_keystore = KeyStore::from_pkcs12(PBES1_KEYSTORE, PASSWORD).unwrap();
+    let seed_keystore = KeyStore::from_pkcs12(PBES1_KEYSTORE, PASSWORD, Pkcs12ImportPolicy::Strict).unwrap();
 
     let chains = seed_keystore
         .entries()
@@ -154,7 +154,7 @@ fn test_keystore_api() {
 
     assert_eq!(chains.len(), 2);
 
-    let seed_truststore = KeyStore::from_pkcs12(PBES1_TRUSTSTORE, PASSWORD).unwrap();
+    let seed_truststore = KeyStore::from_pkcs12(PBES1_TRUSTSTORE, PASSWORD, Pkcs12ImportPolicy::Strict).unwrap();
 
     let cert = seed_truststore
         .entries()
@@ -189,7 +189,7 @@ fn test_keystore_api() {
     new_store.rename_entry("c1", "c2");
 
     let pfx = new_store.writer("mypwd").write().unwrap();
-    let reloaded = KeyStore::from_pkcs12(&pfx, "mypwd").unwrap();
+    let reloaded = KeyStore::from_pkcs12(&pfx, "mypwd", Pkcs12ImportPolicy::Strict).unwrap();
 
     assert!(matches!(reloaded.entry("c2"), Some(KeyStoreEntry::Certificate(_))));
 
@@ -205,7 +205,7 @@ fn test_keystore_api() {
 #[test]
 fn test_keystore_api_with_aes_key() {
     //let entries = Map<String,>
-    let keystore_with_aes_key = KeyStore::from_pkcs12(PBES2_KEYSTORE_AES_KEY, PASSWORD);
+    let keystore_with_aes_key = KeyStore::from_pkcs12(PBES2_KEYSTORE_AES_KEY, PASSWORD, Pkcs12ImportPolicy::Strict);
 
     assert!(&keystore_with_aes_key.is_ok());
 
@@ -230,14 +230,15 @@ fn test_keystore_api_with_aes_key() {
 
 #[test]
 fn test_keystore_read_write_copy() {
-    let keystore_with_keys = KeyStore::from_pkcs12(PBES2_KEYSTORE_AES_KEY, PASSWORD);
+    let keystore_with_keys = KeyStore::from_pkcs12(PBES2_KEYSTORE_AES_KEY, PASSWORD, Pkcs12ImportPolicy::Strict);
 
     assert!(&keystore_with_keys.is_ok());
 
     if let Ok(keystore_with_keys) = keystore_with_keys {
         let store_data = keystore_with_keys.writer("welcome1").write().unwrap();
 
-        let keystore_with_keys_copy = KeyStore::from_pkcs12(&store_data, "welcome1").unwrap();
+        let keystore_with_keys_copy =
+            KeyStore::from_pkcs12(&store_data, "welcome1", Pkcs12ImportPolicy::Strict).unwrap();
         assert_eq!(13, keystore_with_keys_copy.entries_len());
     }
 }
@@ -249,6 +250,6 @@ fn test_keystore_create() {
     keystore.add_entry("test", KeyStoreEntry::Secret(secret));
     let store_data = keystore.writer("welcome1").write().unwrap();
 
-    let keystore_with_keys_copy = KeyStore::from_pkcs12(&store_data, "welcome1").unwrap();
+    let keystore_with_keys_copy = KeyStore::from_pkcs12(&store_data, "welcome1", Pkcs12ImportPolicy::Strict).unwrap();
     assert_eq!(1, keystore_with_keys_copy.entries_len());
 }
