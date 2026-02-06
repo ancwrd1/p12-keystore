@@ -102,7 +102,7 @@ impl KeyStore {
         }
 
         for key in parsed_keys {
-            let should_link = !matches!(policy, Pkcs12ImportPolicy::Raw);
+            let should_link = policy != Pkcs12ImportPolicy::Raw;
             let cert_entry = if should_link {
                 parsed_certs.iter().find(|c| {
                     c.local_key_id
@@ -142,7 +142,7 @@ impl KeyStore {
                     certs,
                 };
                 keystore.add_entry(alias, KeyStoreEntry::PrivateKeyChain(key_chain));
-            } else if !matches!(policy, Pkcs12ImportPolicy::Strict) {
+            } else if policy != Pkcs12ImportPolicy::Strict {
                 let alias = key
                     .friendly_name
                     .clone()
@@ -158,10 +158,7 @@ impl KeyStore {
         }
 
         for cert in parsed_certs {
-            let should_import = match policy {
-                Pkcs12ImportPolicy::Raw => true,
-                _ => cert.local_key_id.is_none() && cert.trusted,
-            };
+            let should_import = policy == Pkcs12ImportPolicy::Raw || (cert.local_key_id.is_none() && cert.trusted);
 
             if should_import {
                 let alias: String = cert.friendly_name.clone().unwrap_or_else(|| cert.cert.subject.clone());
