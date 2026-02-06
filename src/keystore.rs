@@ -164,7 +164,7 @@ impl KeyStore {
             };
 
             if should_import {
-                let alias = cert.friendly_name.clone().unwrap_or_else(|| cert.cert.subject.clone());
+                let alias: String = cert.friendly_name.clone().unwrap_or_else(|| cert.cert.subject.clone());
                 keystore.add_entry(&alias, KeyStoreEntry::Certificate(cert.cert));
             }
         }
