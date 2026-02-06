@@ -231,6 +231,18 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
             .unwrap_or_default();
 
         match bag.bag_id {
+            oid::PKCS_12_KEY_BAG_OID => {
+                let cs: ContextSpecific<PrivateKeyInfo> = ContextSpecific::from_der(&bag.bag_value)?;
+                if let Some(local_key_id) = local_key_id {
+                    let key = PrivateKey::from_der(&cs.value.to_der()?)?;
+                    let key = PrivateKeyChain {
+                        key: key,
+                        local_key_id: local_key_id.into(),
+                        certs: vec![],
+                    };
+                    keys.push(ParsedKeyChain { friendly_name, key });
+                }
+            }
             oid::PKCS_12_CERT_BAG_OID => {
                 let cs: ContextSpecific<CertBag> = ContextSpecific::from_der(&bag.bag_value)?;
                 if cs.value.cert_id != oid::CERT_TYPE_X509_CERTIFICATE_OID {
@@ -244,7 +256,7 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
                     cert,
                 });
             }
-            oid::PKCS_12_PKCS8_KEY_BAG_OID => {
+            oid::PKCS_12_PKCS8_SHROUDED_KEY_BAG_OID => {
                 let cs: ContextSpecific<EncryptedPrivateKeyInfo> = ContextSpecific::from_der(&bag.bag_value)?;
 
                 let decrypted = decrypt(
@@ -409,7 +421,7 @@ pub fn secret_to_safe_bag(
     let encrypted_key_info_os = OctetString::new(encrypted_key_info.to_der()?)?;
 
     let secret_bag = SecretBag {
-        object_identifier: oid::PKCS_12_PKCS8_KEY_BAG_OID,
+        object_identifier: oid::PKCS_12_PKCS8_SHROUDED_KEY_BAG_OID,
         encrypted_private_key_info: encrypted_key_info_os,
         bag_attributes: None,
     };
@@ -458,7 +470,7 @@ pub fn private_key_to_safe_bag(
     .to_der()?;
 
     Ok(SafeBag {
-        bag_id: oid::PKCS_12_PKCS8_KEY_BAG_OID,
+        bag_id: oid::PKCS_12_PKCS8_SHROUDED_KEY_BAG_OID,
         bag_value: pk_info,
         bag_attributes: Some(bag_attributes),
     })
@@ -579,7 +591,6 @@ mod tests {
         let secret = SecretBag::from_bag_der(der.as_slice());
         assert!(secret.is_ok());
         if let Ok(secret) = secret {
-            //println!("{:#?}", secret);
             let private_key_info = secret.private_key_info(TEST_STORE_PASSWORD);
             match private_key_info {
                 Ok(priv_key_info) => {

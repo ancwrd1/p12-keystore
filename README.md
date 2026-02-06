@@ -30,14 +30,16 @@ Limitations:
 Usage example:
 
 ```rust,no_run
-use p12_keystore::KeyStore;
+use p12_keystore::{KeyStore, Pkcs12ImportPolicy};
 
 const PASSWORD: &str = "changeit";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let data = std::fs::read(std::env::args().nth(1).unwrap())?;
 
-    let keystore = KeyStore::from_pkcs12(&data, PASSWORD)?;
+    let policy = Pkcs12ImportPolicy::Strict;
+
+    let keystore = KeyStore::from_pkcs12(&data, PASSWORD, policy)?;
 
     if let Some((alias, chain)) = keystore.private_key_chain() {
         println!(
