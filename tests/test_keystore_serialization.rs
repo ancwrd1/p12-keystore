@@ -1,16 +1,17 @@
-use p12_keystore::{EncryptionAlgorithm, KeyStore, MacAlgorithm};
+use p12_keystore::{EncryptionAlgorithm, KeyStore, MacAlgorithm, Pkcs12ImportPolicy};
 
 const PBES1_KEYSTORE: &[u8] = include_bytes!("../tests/assets/pbes1-keystore.p12");
 const PBES2_KEYSTORE: &[u8] = include_bytes!("../tests/assets/pbes2-keystore.p12");
 const PBES1_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pbes1-truststore.p12");
 const PBES2_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pbes2-truststore.p12");
 const PFX_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pfx-ed25519.pfx");
+const CLEAR_TWOCERT: &[u8] = include_bytes!("../tests/assets/clear_twocert.p12");
 
 const PASSWORD: &str = "changeit";
 const ITERATIONS: u32 = 1000;
 
 fn common_read_test(pkcs12: &[u8]) {
-    let keystore = KeyStore::from_pkcs12(pkcs12, PASSWORD).unwrap();
+    let keystore = KeyStore::from_pkcs12(pkcs12, PASSWORD, Pkcs12ImportPolicy::Strict).unwrap();
 
     for e in keystore.entries() {
         println!("{}: {:#?}", e.0, e.1);
@@ -25,7 +26,7 @@ fn common_write_test(
     mac_alg: MacAlgorithm,
     mac_iterations: u32,
 ) {
-    let keystore = KeyStore::from_pkcs12(pkcs12, PASSWORD).unwrap();
+    let keystore = KeyStore::from_pkcs12(pkcs12, PASSWORD, Pkcs12ImportPolicy::Strict).unwrap();
 
     let data = keystore
         .writer(PASSWORD)
@@ -37,7 +38,7 @@ fn common_write_test(
         .expect(name);
 
     //std::fs::write(format!("/tmp/{name}.p12"), &data).unwrap();
-    KeyStore::from_pkcs12(&data, PASSWORD).expect(name);
+    KeyStore::from_pkcs12(&data, PASSWORD, Pkcs12ImportPolicy::Strict).expect(name);
 }
 
 #[test]
@@ -61,8 +62,23 @@ fn test_parse_pbes2_truststore() {
 }
 
 #[test]
+fn test_parse_clear_twocerts_bundle() {
+    let keystore = KeyStore::from_pkcs12(CLEAR_TWOCERT, "", Pkcs12ImportPolicy::Raw).unwrap();
+
+    for e in keystore.entries() {
+        println!("{}: {:#?}", e.0, e.1)
+    }
+
+    assert_eq!(
+        3,
+        keystore.entries().len(),
+        "both certificates must be present + the key"
+    );
+}
+
+#[test]
 fn test_parse_self_signed_pfx() {
-    let keystore = KeyStore::from_pkcs12(PFX_TRUSTSTORE, PASSWORD).unwrap();
+    let keystore = KeyStore::from_pkcs12(PFX_TRUSTSTORE, PASSWORD, Pkcs12ImportPolicy::Strict).unwrap();
 
     for e in keystore.entries() {
         println!("{}: {:#?}", e.0, e.1)

@@ -86,7 +86,7 @@ impl fmt::Debug for PrivateKey {
 #[derive(Clone, PartialEq, Eq)]
 pub struct PrivateKeyChain {
     pub(crate) key: PrivateKey,
-    pub(crate) local_key_id: LocalKeyId,
+    pub(crate) local_key_id: LocalKeyId, // Could it be optional?
     pub(crate) certs: Vec<Certificate>,
 }
 
