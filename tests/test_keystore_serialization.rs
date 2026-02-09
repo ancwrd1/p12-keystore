@@ -63,7 +63,7 @@ fn test_parse_pbes2_truststore() {
 
 #[test]
 fn test_parse_clear_twocerts_bundle() {
-    let keystore = KeyStore::from_pkcs12(CLEAR_TWOCERT, "", Pkcs12ImportPolicy::Relaxed).unwrap();
+    let keystore = KeyStore::from_pkcs12(CLEAR_TWOCERT, "", Pkcs12ImportPolicy::Raw).unwrap();
 
     for e in keystore.entries() {
         println!("{}: {:#?}", e.0, e.1)
