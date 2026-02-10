@@ -236,7 +236,7 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
                 if let Some(local_key_id) = local_key_id {
                     let key = PrivateKey::from_der(&cs.value.to_der()?)?;
                     let key = PrivateKeyChain {
-                        key: key,
+                        key,
                         local_key_id: local_key_id.into(),
                         certs: vec![],
                     };
@@ -277,15 +277,15 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
             oid::PKCS_12_SECRET_BAG_OID => {
                 let secret_bag = SecretBag::from_bag_der(&bag.bag_value)?;
 
-                if let Ok(priv_key) = secret_bag.private_key_info(password)
-                    && let Some(local_key_id) = local_key_id
-                {
-                    let key = Secret {
-                        key_type: SecretKeyType::from_oid(&priv_key.algorithm.oid),
-                        key: priv_key.private_key.into_bytes().into(),
-                        local_key_id: local_key_id.into(),
-                    };
-                    secrets.push(ParsedSecret { friendly_name, key });
+                if let Ok(priv_key) = secret_bag.private_key_info(password) {
+                    if let Some(local_key_id) = local_key_id {
+                        let key = Secret {
+                            key_type: SecretKeyType::from_oid(&priv_key.algorithm.oid),
+                            key: priv_key.private_key.into_bytes().into(),
+                            local_key_id: local_key_id.into(),
+                        };
+                        secrets.push(ParsedSecret { friendly_name, key });
+                    }
                 }
             }
             _ => {}
@@ -354,14 +354,16 @@ impl SecretBag {
     pub fn private_key_info(&self, password: &str) -> Result<PrivateKeyInfo> {
         if let Ok(enc_key) =
             pkcs12::pbe_params::EncryptedPrivateKeyInfo::from_der(self.encrypted_private_key_info.as_bytes())
-            && let Ok(plain) = decrypt(
+        {
+            if let Ok(plain) = decrypt(
                 &enc_key.encryption_algorithm,
                 enc_key.encrypted_data.as_bytes(),
                 password,
-            )
-            && let Ok(priv_key) = PrivateKeyInfo::from_der(&plain)
-        {
-            return Ok(priv_key);
+            ) {
+                if let Ok(priv_key) = PrivateKeyInfo::from_der(&plain) {
+                    return Ok(priv_key);
+                }
+            }
         }
         Err(Error::UnsupportedEncryptionScheme)
     }
