@@ -32,14 +32,11 @@ fn test_relaxed_policy() {
 
     // Keys with matching certificates should have cert chains
     // Keys without matching certificates should have empty cert chains
-    let mut has_empty_chain = false;
     let mut has_full_chain = false;
 
     for (_, entry) in keystore.entries() {
         if let KeyStoreEntry::PrivateKeyChain(chain) = entry {
-            if chain.certs().is_empty() {
-                has_empty_chain = true;
-            } else {
+            if !chain.certs().is_empty() {
                 has_full_chain = true;
             }
         }

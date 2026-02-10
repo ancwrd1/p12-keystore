@@ -9,6 +9,7 @@ documentation = "https://docs.rs/p12-keystore"
 readme = "README.md"
 keywords = ["pkcs12", "pfx", "keystore", "truststore"]
 edition = "2024"
+rust-version = "1.85"
 
 [features]
 default = ["pbes1"]
@@ -21,7 +22,10 @@ pkcs12 = { version = "0.2.0-pre.0", features = ["kdf"] }
 cms = "0.3.0-pre.1"
 der = { version = "0.8.0-rc.10", features = ["std", "derive"] }
 thiserror = "2"
-cbc = { version = "0.2.0-rc.2", features = ["block-padding", "alloc"], optional = true }
+cbc = { version = "0.2.0-rc.2", features = [
+    "block-padding",
+    "alloc",
+], optional = true }
 rc2 = { version = "0.9.0-rc.0", optional = true }
 des = { version = "0.9.0-rc.2", optional = true }
 sha1 = "0.11.0-rc.4"

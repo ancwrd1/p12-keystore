@@ -236,7 +236,7 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
                 if let Some(local_key_id) = local_key_id {
                     let key = PrivateKey::from_der(&cs.value.to_der()?)?;
                     let key = PrivateKeyChain {
-                        key: key,
+                        key,
                         local_key_id: local_key_id.into(),
                         certs: vec![],
                     };
