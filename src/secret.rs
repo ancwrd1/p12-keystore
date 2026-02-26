@@ -4,7 +4,7 @@ use crate::oid::{
     HMAC_SHA256_KEY_OID, HMAC_SHA384_KEY_OID, HMAC_SHA512_KEY_OID, RC2_CBC_KEY_OID, RC4_KEY_OID,
 };
 use cms::cert::x509::spki::ObjectIdentifier;
-use rand::{RngCore, TryRngCore, rngs::OsRng};
+use rand::{Rng, TryRng, rngs::SysRng};
 use std::fmt;
 use std::time::UNIX_EPOCH;
 
@@ -177,7 +177,7 @@ pub trait RandomGenerator {
 }
 
 /// Implements random generator for all RngCore implementations
-impl<R: RngCore + ?Sized> RandomGenerator for R {
+impl<R: Rng + ?Sized> RandomGenerator for R {
     /// returns a random u32
     fn try_next_u32(&mut self) -> Result<u32, SecretKeyBuilderError> {
         Ok(R::next_u32(self))
@@ -196,7 +196,7 @@ pub struct OsRngRandomGenerator;
 /// Implementation for OsRng
 impl RandomGenerator for OsRngRandomGenerator {
     fn try_next_u32(&mut self) -> Result<u32, SecretKeyBuilderError> {
-        match OsRng.try_next_u32() {
+        match SysRng.try_next_u32() {
             Ok(rnd) => Ok(rnd),
             Err(_) => Err(SecretKeyBuilderError::RandomGenerationError),
         }
@@ -204,7 +204,7 @@ impl RandomGenerator for OsRngRandomGenerator {
 
     /// fills a byte buffer with random
     fn try_fill_bytes(&mut self, buf: &mut [u8]) -> Result<(), SecretKeyBuilderError> {
-        match OsRng.try_fill_bytes(buf) {
+        match SysRng.try_fill_bytes(buf) {
             Ok(_) => Ok(()),
             Err(_) => Err(SecretKeyBuilderError::RandomGenerationError),
         }
