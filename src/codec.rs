@@ -157,7 +157,7 @@ fn encrypt(
         EncryptionAlgorithm::PbeWithHmacSha256AndAes256 => {
             let salt: [u8; 32] = random();
             let iv: [u8; 16] = random();
-            let params = pbes2::Parameters::pbkdf2_sha256_aes256cbc(iterations as _, &salt, iv)
+            let params = pbes2::Parameters::generate_pbkdf2_sha256_aes256cbc(iterations as _, &salt, iv)
                 .map_err(|e| Error::Pkcs5Error(e.to_string()))?;
 
             let encrypted = params

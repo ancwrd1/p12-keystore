@@ -322,8 +322,8 @@ impl Pkcs12Writer<'_, '_> {
         let chain_certs = self
             .keystore
             .entries
-            .iter()
-            .filter_map(|(_, entry)| match entry {
+            .values()
+            .filter_map(|entry| match entry {
                 KeyStoreEntry::PrivateKeyChain(chain) => Some(chain.certs.iter().enumerate().map(|(i, c)| {
                     (
                         if i == 0 {
