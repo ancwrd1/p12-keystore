@@ -39,5 +39,5 @@ pub use rand;
 pub type Result<T> = std::result::Result<T, error::Error>;
 
 pub use cert::Certificate;
-pub use keychain::{LocalKeyId, PrivateKeyChain};
+pub use keychain::{LocalKeyId, PrivateKey, PrivateKeyChain};
 pub use keystore::{EncryptionAlgorithm, KeyStore, KeyStoreEntry, MacAlgorithm, Pkcs12ImportPolicy, Pkcs12Writer};

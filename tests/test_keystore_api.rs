@@ -1,7 +1,7 @@
 extern crate core;
 
 use p12_keystore::{
-    KeyStore, KeyStoreEntry, Pkcs12ImportPolicy,
+    Certificate, KeyStore, KeyStoreEntry, Pkcs12ImportPolicy, PrivateKey, PrivateKeyChain,
     secret::{Secret, SecretKeyType},
 };
 
@@ -9,6 +9,9 @@ const PBES1_KEYSTORE: &[u8] = include_bytes!("../tests/assets/pbes1-keystore.p12
 const PBES1_TRUSTSTORE: &[u8] = include_bytes!("../tests/assets/pbes1-truststore.p12");
 
 const PBES2_KEYSTORE_AES_KEY: &[u8] = include_bytes!("assets/pbes2-keystore-with-secret-keys.p12");
+
+const PKCS8_PRIVATE_KEY: &[u8] = include_bytes!("assets/key-ed25519.der");
+const X509_CERT: &[u8] = include_bytes!("assets/cert-ed25519.der");
 
 const PASSWORD: &str = "changeit";
 
@@ -244,7 +247,7 @@ fn test_keystore_read_write_copy() {
 }
 
 #[test]
-fn test_keystore_create() {
+fn test_keystore_create_secret() {
     let mut keystore = KeyStore::new();
     let secret = Secret::builder(SecretKeyType::Aes).with_length(24).build().unwrap();
     keystore.add_entry("test", KeyStoreEntry::Secret(secret));
@@ -252,4 +255,24 @@ fn test_keystore_create() {
 
     let keystore_with_keys_copy = KeyStore::from_pkcs12(&store_data, "welcome1", Pkcs12ImportPolicy::Strict).unwrap();
     assert_eq!(1, keystore_with_keys_copy.entries_len());
+}
+
+#[test]
+fn test_keystore_create_private_key_chain() {
+    let mut keystore = KeyStore::new();
+    let keychain = PrivateKeyChain::new(
+        [1u8, 2, 3, 4].as_slice(),
+        PrivateKey::from_der(PKCS8_PRIVATE_KEY).unwrap(),
+        [Certificate::from_der(X509_CERT).unwrap()],
+    );
+
+    keystore.add_entry("test", KeyStoreEntry::PrivateKeyChain(keychain));
+    let store_data = keystore.writer("changeit").write().unwrap();
+
+    let keystore_with_keys_copy = KeyStore::from_pkcs12(&store_data, "changeit", Pkcs12ImportPolicy::Strict).unwrap();
+    assert_eq!(1, keystore_with_keys_copy.entries_len());
+    assert!(matches!(
+        keystore_with_keys_copy.private_key_chain(),
+        Some(("test", PrivateKeyChain { .. }))
+    ))
 }
