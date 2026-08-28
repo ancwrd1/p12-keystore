@@ -271,7 +271,12 @@ impl EncryptionAlgorithm {
 #[non_exhaustive]
 pub enum MacAlgorithm {
     HmacSha1,
+    HmacSha224,
     HmacSha256,
+    HmacSha384,
+    HmacSha512,
+    HmacSha512_224,
+    HmacSha512_256,
 }
 
 /// PKCS#12 writer

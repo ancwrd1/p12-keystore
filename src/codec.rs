@@ -11,7 +11,7 @@ use der::{
     Any, Decode, Encode, Sequence,
     asn1::{BmpString, ContextSpecific, ObjectIdentifier, OctetString, OctetStringRef, SetOfVec},
 };
-use hmac::{KeyInit, Mac, digest::Digest};
+use hmac::{KeyInit, Mac};
 use pkcs5::pbes2;
 use pkcs12::{
     CertBag, DigestInfo, MacData, kdf,
@@ -20,7 +20,7 @@ use pkcs12::{
 };
 use rand::random;
 use sha1::Sha1;
-use sha2::Sha256;
+use sha2::{Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256};
 #[cfg(feature = "pbes1")]
 use {
     crate::pbes1::{PbeMode, Pbes1},
@@ -60,9 +60,7 @@ pub struct ParsedAuthSafe {
     pub secrets: Vec<ParsedSecret>,
 }
 
-const MAX_MAC_ITERATIONS: i32 = 1_000_000;
-
-// Upper bound for KDF iteration counts read from container DER.
+pub(crate) const MAX_MAC_ITERATIONS: i32 = 1_000_000;
 const MAX_KDF_ITERATIONS: i32 = 1_000_000;
 
 // Cap on scrypt effective memory cost (128 * N * r). 1 GiB.
@@ -84,38 +82,52 @@ fn scrypt_within_limits(params: &pkcs5::pbes2::ScryptParams) -> bool {
     }
 }
 
+macro_rules! verify_traditional_mac {
+    ($digest:ty, $mac_data:expr, $password:expr, $data:expr) => {{
+        let mac_data = $mac_data;
+        let key = kdf::derive_key_utf8::<$digest>(
+            $password,
+            mac_data.mac_salt.as_bytes(),
+            kdf::Pkcs12KeyType::Mac,
+            mac_data.iterations,
+            <$digest as hmac::digest::OutputSizeUser>::output_size(),
+        )?;
+        let mut mac = hmac::Hmac::<$digest>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
+        mac.update($data);
+        mac.verify_slice(mac_data.mac.digest.as_bytes())?;
+        Ok(())
+    }};
+}
+
+macro_rules! compute_traditional_mac {
+    ($digest:ty, $data:expr, $iterations:expr, $password:expr) => {{
+        let salt: [u8; 8] = random();
+        let key = kdf::derive_key_utf8::<$digest>(
+            $password,
+            &salt,
+            kdf::Pkcs12KeyType::Mac,
+            $iterations,
+            <$digest as hmac::digest::OutputSizeUser>::output_size(),
+        )?;
+        let mut mac = hmac::Hmac::<$digest>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
+        mac.update($data);
+        (salt.to_vec(), mac.finalize().into_bytes().to_vec())
+    }};
+}
+
 pub fn verify_mac(mac_data: &MacData, password: &str, data: &[u8]) -> Result<()> {
     if mac_data.iterations > MAX_MAC_ITERATIONS {
         return Err(Error::InvalidParameters);
     }
 
     match mac_data.mac.algorithm.oid {
-        oid::SHA1_OID => {
-            let key = kdf::derive_key_utf8::<Sha1>(
-                password,
-                mac_data.mac_salt.as_bytes(),
-                kdf::Pkcs12KeyType::Mac,
-                mac_data.iterations,
-                Sha1::output_size(),
-            )?;
-            let mut hmac = hmac::Hmac::<Sha1>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
-            hmac.update(data);
-            hmac.verify_slice(mac_data.mac.digest.as_bytes())?;
-            Ok(())
-        }
-        oid::SHA256_OID => {
-            let key = kdf::derive_key_utf8::<Sha256>(
-                password,
-                mac_data.mac_salt.as_bytes(),
-                kdf::Pkcs12KeyType::Mac,
-                mac_data.iterations,
-                Sha256::output_size(),
-            )?;
-            let mut hmac = hmac::Hmac::<Sha256>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
-            hmac.update(data);
-            hmac.verify_slice(mac_data.mac.digest.as_bytes())?;
-            Ok(())
-        }
+        oid::SHA1_OID => verify_traditional_mac!(Sha1, mac_data, password, data),
+        oid::SHA224_OID => verify_traditional_mac!(Sha224, mac_data, password, data),
+        oid::SHA256_OID => verify_traditional_mac!(Sha256, mac_data, password, data),
+        oid::SHA384_OID => verify_traditional_mac!(Sha384, mac_data, password, data),
+        oid::SHA512_OID => verify_traditional_mac!(Sha512, mac_data, password, data),
+        oid::SHA512_224_OID => verify_traditional_mac!(Sha512_224, mac_data, password, data),
+        oid::SHA512_256_OID => verify_traditional_mac!(Sha512_256, mac_data, password, data),
         _ => Err(Error::UnsupportedEncryptionScheme),
     }
 }
@@ -555,30 +567,32 @@ pub fn key_bags_to_auth_safe(bags: Vec<SafeBag>) -> Result<ContentInfo> {
 pub fn compute_mac(data: &[u8], algorithm: MacAlgorithm, iterations: i32, password: &str) -> Result<MacData> {
     let (oid, salt, digest) = match algorithm {
         MacAlgorithm::HmacSha1 => {
-            let salt: [u8; 20] = random();
-            let key = kdf::derive_key_utf8::<Sha1>(
-                password,
-                &salt,
-                kdf::Pkcs12KeyType::Mac,
-                iterations,
-                Sha1::output_size(),
-            )?;
-            let mut hmac = hmac::Hmac::<Sha1>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
-            hmac.update(data);
-            (oid::SHA1_OID, salt.to_vec(), hmac.finalize().into_bytes().to_vec())
+            let (salt, digest) = compute_traditional_mac!(Sha1, data, iterations, password);
+            (oid::SHA1_OID, salt, digest)
+        }
+        MacAlgorithm::HmacSha224 => {
+            let (salt, digest) = compute_traditional_mac!(Sha224, data, iterations, password);
+            (oid::SHA224_OID, salt, digest)
         }
         MacAlgorithm::HmacSha256 => {
-            let salt: [u8; 32] = random();
-            let key = kdf::derive_key_utf8::<Sha256>(
-                password,
-                &salt,
-                kdf::Pkcs12KeyType::Mac,
-                iterations,
-                Sha256::output_size(),
-            )?;
-            let mut hmac = hmac::Hmac::<Sha256>::new_from_slice(&key).map_err(|_| Error::InvalidLength)?;
-            hmac.update(data);
-            (oid::SHA256_OID, salt.to_vec(), hmac.finalize().into_bytes().to_vec())
+            let (salt, digest) = compute_traditional_mac!(Sha256, data, iterations, password);
+            (oid::SHA256_OID, salt, digest)
+        }
+        MacAlgorithm::HmacSha384 => {
+            let (salt, digest) = compute_traditional_mac!(Sha384, data, iterations, password);
+            (oid::SHA384_OID, salt, digest)
+        }
+        MacAlgorithm::HmacSha512 => {
+            let (salt, digest) = compute_traditional_mac!(Sha512, data, iterations, password);
+            (oid::SHA512_OID, salt, digest)
+        }
+        MacAlgorithm::HmacSha512_224 => {
+            let (salt, digest) = compute_traditional_mac!(Sha512_224, data, iterations, password);
+            (oid::SHA512_224_OID, salt, digest)
+        }
+        MacAlgorithm::HmacSha512_256 => {
+            let (salt, digest) = compute_traditional_mac!(Sha512_256, data, iterations, password);
+            (oid::SHA512_256_OID, salt, digest)
         }
     };
 
@@ -671,6 +685,24 @@ mod tests {
         let private_key_value = private_key_info.private_key.as_bytes();
         assert_eq!(secret.key(), private_key_value);
         assert_eq!(secret.key().len(), private_key_value.len());
+    }
+
+    #[test]
+    fn traditional_mac_round_trip_sha2_variants() {
+        let data = b"authenticated safe";
+        let password = TEST_STORE_PASSWORD;
+        for algorithm in [
+            MacAlgorithm::HmacSha1,
+            MacAlgorithm::HmacSha224,
+            MacAlgorithm::HmacSha256,
+            MacAlgorithm::HmacSha384,
+            MacAlgorithm::HmacSha512,
+            MacAlgorithm::HmacSha512_224,
+            MacAlgorithm::HmacSha512_256,
+        ] {
+            let mac = compute_mac(data, algorithm, 2048, password).expect("compute MAC");
+            verify_mac(&mac, password, data).expect("verify MAC");
+        }
     }
 
     #[test]
