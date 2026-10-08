@@ -27,6 +27,16 @@ Limitations:
 
 [Documentation](https://docs.rs/p12-keystore)
 
+For applications that need to validate every certificate bag before chain
+construction, `Pkcs12Archive::from_pkcs12` exposes decoded private keys,
+certificates, and secrets before import policies are applied. The collections
+retain duplicates and friendly-name collisions. This API verifies a MAC when
+present and decrypts supported bags; certificate validation is left to callers.
+
+`KeyStore::from_pkcs12` retains colliding aliases using `#2`, `#3`, etc. suffixes
+instead of overwriting imported entries. Its `Strict` policy still filters
+unmatched keys and untrusted certificates as before.
+
 Usage example:
 
 ```rust,no_run

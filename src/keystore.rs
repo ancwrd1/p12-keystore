@@ -3,16 +3,13 @@ use std::collections::{BTreeMap, btree_map::Iter};
 use cms::content_info::ContentInfo;
 use der::{Any, Decode, Encode, asn1::OctetString, oid::ObjectIdentifier};
 use hex::ToHex;
-use pkcs12::{
-    AuthenticatedSafe,
-    pfx::{Pfx, Version},
-};
+use pkcs12::pfx::{Pfx, Version};
 
 use crate::{
     Result,
+    archive::Pkcs12Archive,
     cert::Certificate,
-    codec::{self, ParsedAuthSafe, secret_to_safe_bag},
-    error::Error,
+    codec::{self, secret_to_safe_bag},
     keychain::PrivateKeyChain,
     oid,
     secret::Secret,
@@ -75,44 +72,31 @@ impl KeyStore {
         Self::default()
     }
 
-    /// Parse keystore from PKCS#12 data
+    /// Parse keystore from PKCS#12 data.
+    ///
+    /// Imported alias collisions are retained with `#2`, `#3`, etc. suffixes.
+    /// Use [`Pkcs12Archive`] to inspect certificate bags before policy-based
+    /// linking and filtering, including duplicates and unrelated certificates.
     pub fn from_pkcs12(data: &[u8], password: &str, policy: Pkcs12ImportPolicy) -> Result<Self> {
-        let pfx = Pfx::from_der(data)?;
-
-        if pfx.version != Version::V3 {
-            return Err(Error::InvalidVersion);
-        }
-
-        if let Some(mac_data) = pfx.mac_data {
-            codec::verify_mac(&mac_data, password, pfx.auth_safe.content.value())?;
-        }
-
-        let safes: AuthenticatedSafe = if pfx.auth_safe.content_type == oid::CONTENT_TYPE_DATA_OID {
-            AuthenticatedSafe::from_der(&OctetString::from_der(&pfx.auth_safe.content.to_der()?)?.into_bytes())?
-        } else {
-            return Err(Error::UnsupportedContentType);
-        };
-
+        let Pkcs12Archive {
+            keys: parsed_keys,
+            certs: parsed_certs,
+            secrets: parsed_secrets,
+        } = Pkcs12Archive::from_pkcs12(data, password)?;
         let mut keystore = Self::new();
 
-        let mut parsed_keys = Vec::new();
-        let mut parsed_certs = Vec::new();
-        let mut parsed_secrets = Vec::new();
-
-        for safe in safes.into_iter() {
-            let ParsedAuthSafe { keys, certs, secrets } = codec::parse_auth_safe(&safe, password)?;
-            parsed_keys.extend(keys);
-            parsed_certs.extend(certs);
-            parsed_secrets.extend(secrets);
-        }
-
         for key in parsed_keys {
+            // The keystore model requires a local key ID; the archive API
+            // preserves keys without one for callers with their own policy.
+            let Some(local_key_id) = key.local_key_id else {
+                continue;
+            };
             let should_link = policy != Pkcs12ImportPolicy::Raw;
             let cert_entry = if should_link {
                 parsed_certs.iter().find(|c| {
                     c.local_key_id
                         .as_ref()
-                        .is_some_and(|k| k.as_slice() == key.key.local_key_id.as_ref())
+                        .is_some_and(|k| k.as_slice() == local_key_id.as_ref())
                 })
             } else {
                 None
@@ -146,23 +130,20 @@ impl KeyStore {
                 }
 
                 let key_chain = PrivateKeyChain {
-                    key: key.key.key,
-                    local_key_id: key.key.local_key_id,
+                    key: key.key,
+                    local_key_id,
                     certs,
                 };
-                keystore.add_entry(alias, KeyStoreEntry::PrivateKeyChain(key_chain));
+                keystore.add_imported_entry(alias, KeyStoreEntry::PrivateKeyChain(key_chain));
             } else if policy != Pkcs12ImportPolicy::Strict {
-                let alias = key
-                    .friendly_name
-                    .clone()
-                    .unwrap_or_else(|| key.key.local_key_id.encode_hex());
+                let alias = key.friendly_name.clone().unwrap_or_else(|| local_key_id.encode_hex());
 
                 let key_chain = PrivateKeyChain {
-                    key: key.key.key,
-                    local_key_id: key.key.local_key_id,
+                    key: key.key,
+                    local_key_id,
                     certs: vec![],
                 };
-                keystore.add_entry(&alias, KeyStoreEntry::PrivateKeyChain(key_chain));
+                keystore.add_imported_entry(&alias, KeyStoreEntry::PrivateKeyChain(key_chain));
             }
         }
 
@@ -171,7 +152,7 @@ impl KeyStore {
 
             if should_import {
                 let alias: String = cert.friendly_name.clone().unwrap_or_else(|| cert.cert.subject.clone());
-                keystore.add_entry(&alias, KeyStoreEntry::Certificate(cert.cert));
+                keystore.add_imported_entry(&alias, KeyStoreEntry::Certificate(cert.cert));
             }
         }
 
@@ -180,10 +161,28 @@ impl KeyStore {
                 .friendly_name
                 .clone()
                 .unwrap_or_else(|| secret.key.local_key_id.encode_hex());
-            keystore.add_entry(&alias, KeyStoreEntry::Secret(secret.key));
+            keystore.add_imported_entry(&alias, KeyStoreEntry::Secret(secret.key));
         }
 
         Ok(keystore)
+    }
+
+    // Import must not overwrite a bag with the same friendly name. Keep the
+    // original alias when possible and suffix collisions deterministically.
+    fn add_imported_entry(&mut self, alias: &str, entry: KeyStoreEntry) {
+        if !self.entries.contains_key(alias) {
+            self.add_entry(alias, entry);
+            return;
+        }
+        let mut suffix = 2;
+        loop {
+            let candidate = format!("{alias}#{suffix}");
+            if !self.entries.contains_key(&candidate) {
+                self.add_entry(&candidate, entry);
+                return;
+            }
+            suffix += 1;
+        }
     }
 
     /// Create a keystore writer with a given password to use for data encryption

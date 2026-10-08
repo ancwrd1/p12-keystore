@@ -23,6 +23,7 @@
 //! Supported MAC algorithms: [MacAlgorithm::HmacSha1] through [MacAlgorithm::HmacSha512_256]
 //!
 
+mod archive;
 mod cert;
 mod codec;
 pub mod error;
@@ -41,3 +42,5 @@ pub type Result<T> = std::result::Result<T, error::Error>;
 pub use cert::Certificate;
 pub use keychain::{LocalKeyId, PrivateKey, PrivateKeyChain};
 pub use keystore::{EncryptionAlgorithm, KeyStore, KeyStoreEntry, MacAlgorithm, Pkcs12ImportPolicy, Pkcs12Writer};
+
+pub use archive::{CertificateBag, Pkcs12Archive, PrivateKeyBag, SecretBag};
