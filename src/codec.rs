@@ -37,28 +37,10 @@ pub(crate) use crate::{
     secret::{Secret, SecretKeyType},
 };
 
-pub struct ParsedKeyChain {
-    pub friendly_name: Option<String>,
-    pub key: PrivateKeyChain,
-}
-
-pub struct ParsedSecret {
-    pub friendly_name: Option<String>,
-    pub key: Secret,
-}
-
-pub struct ParsedCertificate {
-    pub friendly_name: Option<String>,
-    pub local_key_id: Option<Vec<u8>>,
-    pub trusted: bool,
-    pub cert: Certificate,
-}
-
-pub struct ParsedAuthSafe {
-    pub keys: Vec<ParsedKeyChain>,
-    pub certs: Vec<ParsedCertificate>,
-    pub secrets: Vec<ParsedSecret>,
-}
+pub(crate) use crate::archive::{
+    CertificateBag as ParsedCertificate, Pkcs12Archive as ParsedAuthSafe, PrivateKeyBag as ParsedKeyChain,
+    SecretBag as ParsedSecret,
+};
 
 pub(crate) const MAX_MAC_ITERATIONS: i32 = 1_000_000;
 const MAX_KDF_ITERATIONS: i32 = 1_000_000;
@@ -287,15 +269,12 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
         match bag.bag_id {
             oid::PKCS_12_KEY_BAG_OID => {
                 let cs: ContextSpecific<PrivateKeyInfo> = ContextSpecific::from_der(&bag.bag_value)?;
-                if let Some(local_key_id) = local_key_id {
-                    let key = PrivateKey::from_der(&cs.value.to_der()?)?;
-                    let key = PrivateKeyChain {
-                        key,
-                        local_key_id: local_key_id.into(),
-                        certs: vec![],
-                    };
-                    keys.push(ParsedKeyChain { friendly_name, key });
-                }
+                let key = PrivateKey::from_der(&cs.value.to_der()?)?;
+                keys.push(ParsedKeyChain {
+                    friendly_name,
+                    key,
+                    local_key_id: local_key_id.map(Into::into),
+                });
             }
             oid::PKCS_12_CERT_BAG_OID => {
                 let cs: ContextSpecific<CertBag> = ContextSpecific::from_der(&bag.bag_value)?;
@@ -319,14 +298,11 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
                     password,
                 )?;
 
-                if let Some(local_key_id) = local_key_id {
-                    let key = PrivateKeyChain {
-                        key: PrivateKey::from_der(&decrypted)?,
-                        local_key_id: local_key_id.into(),
-                        certs: vec![],
-                    };
-                    keys.push(ParsedKeyChain { friendly_name, key });
-                }
+                keys.push(ParsedKeyChain {
+                    friendly_name,
+                    key: PrivateKey::from_der(&decrypted)?,
+                    local_key_id: local_key_id.map(Into::into),
+                });
             }
             oid::PKCS_12_SECRET_BAG_OID => {
                 let secret_bag = SecretBag::from_bag_der(&bag.bag_value)?;
@@ -619,6 +595,32 @@ mod tests {
         oid::BLOWFISH_KEY_OID,
         secret::{Secret, SecretKeyType::Aes},
     };
+
+    #[test]
+    fn key_bags_without_local_ids_are_retained_before_import_policy() {
+        use crate::{KeyStore, Pkcs12ImportPolicy};
+        let store = KeyStore::from_pkcs12(
+            include_bytes!("../tests/assets/clear_twocert.p12"),
+            "",
+            Pkcs12ImportPolicy::Strict,
+        )
+        .unwrap();
+        let chain = store.private_key_chain().unwrap().1;
+        let mut bag = super::private_key_to_safe_bag(
+            chain,
+            "identity",
+            EncryptionAlgorithm::PbeWithHmacSha256AndAes256,
+            100,
+            "",
+        )
+        .unwrap();
+        bag.bag_attributes = None;
+        let bag = SafeBag::from_der(&bag.to_der().unwrap()).unwrap();
+        let parsed = super::parse_bags(vec![bag], "").unwrap();
+        assert_eq!(parsed.keys.len(), 1);
+        assert!(parsed.keys[0].local_key_id.is_none());
+        assert_eq!(parsed.keys[0].key.as_der(), chain.key().as_der());
+    }
 
     // Testdata for writing the full SecretBag struct
     const SECRET_BAG_DATA: &str = "oIGzMIGwBgsqhkiG9w0BDAoBAqCBoASBnTCBmjBmBgkqhkiG9w0BBQ0wWTA4BgkqhkiG9w0BBQwwKwQUnuKEvUWqBU1bJE7g5hYeIU3zsmYCAicQAgEgMAwGCCqGSIb3DQIJBQAwHQYJYIZIAWUDBAEqBBBEitwx8ZcwYypT521bjuv8BDAARNFyg3PJsKUGvngARYN+vtsXHVXEXLOlghj4awwBVf2BW1hZx5Zow+7CF6b/YE4=";
