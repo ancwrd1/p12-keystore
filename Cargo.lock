@@ -446,7 +446,7 @@ dependencies = [
 
 [[package]]
 name = "p12-keystore"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "base64",
  "cbc",

@@ -5,13 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.1] - 2026-10-13
 
 ### Fixed
 
 - Certificate chains with supplementary Unicode in their subjects can be written
   to PKCS#12. Unrepresentable generated friendly names are omitted while the
-  certificates and local key IDs are preserved.
+  certificates and local key IDs are preserved (#14).
 
 ## [0.4.0] - 2026-10-09
 
@@ -106,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release.
 
+[0.4.1]: https://github.com/ancwrd1/p12-keystore/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ancwrd1/p12-keystore/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/ancwrd1/p12-keystore/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/ancwrd1/p12-keystore/compare/v0.3.0...v0.3.1
