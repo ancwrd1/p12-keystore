@@ -324,7 +324,7 @@ impl Pkcs12Writer<'_, '_> {
         });
 
         for (alias, cert) in certs {
-            cert_bags.push(codec::certificate_to_safe_bag(cert, alias, None, true)?);
+            cert_bags.push(codec::certificate_to_safe_bag(cert, Some(alias), None, true)?);
         }
 
         let chain_certs = self
@@ -348,9 +348,17 @@ impl Pkcs12Writer<'_, '_> {
             .flatten();
 
         for (local_key_id, cert) in chain_certs {
+            // friendlyName is optional BMPString metadata. A certificate subject
+            // may contain supplementary Unicode in its UTF8String attributes;
+            // omit the generated label rather than rejecting the certificate.
+            let friendly_name = cert
+                .subject
+                .chars()
+                .all(|c| u32::from(c) <= 0xffff)
+                .then_some(cert.subject.as_str());
             cert_bags.push(codec::certificate_to_safe_bag(
                 cert,
-                &cert.subject,
+                friendly_name,
                 local_key_id,
                 false,
             )?);
