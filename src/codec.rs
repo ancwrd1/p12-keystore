@@ -327,19 +327,20 @@ fn parse_bags(bags: SafeContents, password: &str) -> Result<ParsedAuthSafe> {
 
 pub fn certificate_to_safe_bag(
     certificate: &Certificate,
-    friendly_name: &str,
+    friendly_name: Option<&str>,
     local_key_id: Option<&[u8]>,
     trusted: bool,
 ) -> Result<SafeBag> {
     let mut bag_attributes = Attributes::new();
 
-    let friendly_name =
-        SetOfVec::<AttributeValue>::from_iter([Any::from_der(&BmpString::from_utf8(friendly_name)?.to_der()?)?])?;
-
-    bag_attributes.insert(Attribute {
-        oid: oid::FRIENDLY_NAME_OID,
-        values: friendly_name,
-    })?;
+    if let Some(friendly_name) = friendly_name {
+        let friendly_name =
+            SetOfVec::<AttributeValue>::from_iter([Any::from_der(&BmpString::from_utf8(friendly_name)?.to_der()?)?])?;
+        bag_attributes.insert(Attribute {
+            oid: oid::FRIENDLY_NAME_OID,
+            values: friendly_name,
+        })?;
+    }
 
     if let Some(local_key_id) = local_key_id {
         let local_key_id =

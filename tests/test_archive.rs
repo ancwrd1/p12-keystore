@@ -78,3 +78,51 @@ fn archive_rejects_bad_passwords_and_modified_macs() {
     damaged[last] ^= 1;
     assert!(Pkcs12Archive::from_pkcs12(&damaged, "correct").is_err());
 }
+
+// OpenSSL-generated P-256 leaf and CA with subjects Leaf🔑 and Issuer🚀.
+// Disposable test keys, password fixture-password, 1000 iterations, and
+// certificates valid for 100 years. Only certificate bag labels are omitted;
+// the private key alias and all cryptographic identity bytes must survive.
+const UNICODE_SUBJECT_CHAIN: &[u8] = include_bytes!("assets/unicode-subject-chain.p12");
+
+#[test]
+fn unicode_certificate_subjects_round_trip_without_generated_friendly_names() {
+    let original = Pkcs12Archive::from_pkcs12(UNICODE_SUBJECT_CHAIN, "fixture-password").unwrap();
+    assert_eq!(original.certs.len(), 2);
+    assert!(
+        original
+            .certs
+            .iter()
+            .all(|bag| bag.cert.subject().chars().any(|c| u32::from(c) > 0xffff))
+    );
+    let store = KeyStore::from_pkcs12(UNICODE_SUBJECT_CHAIN, "fixture-password", Pkcs12ImportPolicy::Strict).unwrap();
+    let bytes = store
+        .writer("new-password")
+        .encryption_iterations(100)
+        .mac_iterations(100)
+        .write()
+        .unwrap();
+    let rewritten = Pkcs12Archive::from_pkcs12(&bytes, "new-password").unwrap();
+    assert_eq!(rewritten.keys.len(), 1);
+    assert_eq!(rewritten.keys[0].friendly_name.as_deref(), Some("identity"));
+    assert_eq!(rewritten.keys[0].key.as_der(), original.keys[0].key.as_der());
+    assert_eq!(rewritten.keys[0].local_key_id, original.keys[0].local_key_id);
+    assert_eq!(rewritten.certs.len(), original.certs.len());
+    for (actual, expected) in rewritten.certs.iter().zip(&original.certs) {
+        assert_eq!(actual.cert.as_der(), expected.cert.as_der());
+        assert_eq!(actual.local_key_id, expected.local_key_id);
+        assert!(actual.friendly_name.is_none());
+        assert!(!actual.trusted);
+    }
+    let reopened = KeyStore::from_pkcs12(&bytes, "new-password", Pkcs12ImportPolicy::Strict).unwrap();
+    assert_eq!(reopened.private_key_chain().unwrap().0, "identity");
+    assert_eq!(reopened.private_key_chain().unwrap().1.certs().len(), 2);
+}
+
+#[test]
+fn explicit_certificate_aliases_still_require_bmp_characters() {
+    let archive = Pkcs12Archive::from_pkcs12(UNICODE_SUBJECT_CHAIN, "fixture-password").unwrap();
+    let mut store = KeyStore::new();
+    store.add_entry("alias🔑", KeyStoreEntry::Certificate(archive.certs[0].cert.clone()));
+    assert!(store.writer("password").write().is_err());
+}
