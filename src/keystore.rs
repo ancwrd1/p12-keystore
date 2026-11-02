@@ -330,12 +330,12 @@ impl Pkcs12Writer<'_, '_> {
         let chain_certs = self
             .keystore
             .entries
-            .values()
-            .filter_map(|entry| match entry {
-                KeyStoreEntry::PrivateKeyChain(chain) => Some(chain.certs.iter().enumerate().map(|(i, c)| {
+            .iter()
+            .filter_map(|(alias, entry)| match entry {
+                KeyStoreEntry::PrivateKeyChain(chain) => Some(chain.certs.iter().enumerate().map(move |(i, c)| {
                     (
                         if i == 0 {
-                            Some(chain.local_key_id.as_ref())
+                            Some((alias, chain.local_key_id.as_ref()))
                         } else {
                             None
                         },
@@ -347,19 +347,24 @@ impl Pkcs12Writer<'_, '_> {
             })
             .flatten();
 
-        for (local_key_id, cert) in chain_certs {
-            // friendlyName is optional BMPString metadata. A certificate subject
-            // may contain supplementary Unicode in its UTF8String attributes;
-            // omit the generated label rather than rejecting the certificate.
-            let friendly_name = cert
-                .subject
-                .chars()
-                .all(|c| u32::from(c) <= 0xffff)
-                .then_some(cert.subject.as_str());
+        for (leaf, cert) in chain_certs {
+            let friendly_name = match leaf {
+                // The leaf certificate is labelled with the entry alias, as its
+                // private key is (Java keytool, `openssl pkcs12 -export -name`).
+                Some((alias, _)) => Some(alias.as_str()),
+                // friendlyName is optional BMPString metadata. A certificate subject
+                // may contain supplementary Unicode in its UTF8String attributes;
+                // omit the generated label rather than rejecting the certificate.
+                None => cert
+                    .subject
+                    .chars()
+                    .all(|c| u32::from(c) <= 0xffff)
+                    .then_some(cert.subject.as_str()),
+            };
             cert_bags.push(codec::certificate_to_safe_bag(
                 cert,
                 friendly_name,
-                local_key_id,
+                leaf.map(|(_, local_key_id)| local_key_id),
                 false,
             )?);
         }

@@ -79,10 +79,33 @@ fn archive_rejects_bad_passwords_and_modified_macs() {
     assert!(Pkcs12Archive::from_pkcs12(&damaged, "correct").is_err());
 }
 
+// Java keytool and `openssl pkcs12 -export -name` label the leaf certificate
+// with the entry alias, as its private key is labelled. Importers such as the
+// Windows certificate store display the leaf certificate's friendlyName.
+#[test]
+fn leaf_certificate_bag_takes_the_entry_alias() {
+    let original = Pkcs12Archive::from_pkcs12(FIXTURE, "").unwrap();
+    let chain = fixture_chain();
+    let leaf = chain.certs()[0].clone();
+    let other = original.certs.iter().find(|bag| bag.cert != leaf).unwrap().cert.clone();
+    let chain = PrivateKeyChain::new(chain.local_key_id().clone(), chain.key().clone(), [leaf, other]);
+    let bytes = write(chain, "identity", "password");
+    let archive = Pkcs12Archive::from_pkcs12(&bytes, "password").unwrap();
+    assert_eq!(archive.keys[0].friendly_name.as_deref(), Some("identity"));
+    assert_eq!(archive.certs[0].friendly_name.as_deref(), Some("identity"));
+    assert_eq!(
+        archive.certs[1].friendly_name.as_deref(),
+        Some(archive.certs[1].cert.subject())
+    );
+    let reopened = KeyStore::from_pkcs12(&bytes, "password", Pkcs12ImportPolicy::Strict).unwrap();
+    assert_eq!(reopened.private_key_chain().unwrap().0, "identity");
+}
+
 // OpenSSL-generated P-256 leaf and CA with subjects Leaf🔑 and Issuer🚀.
 // Disposable test keys, password fixture-password, 1000 iterations, and
-// certificates valid for 100 years. Only certificate bag labels are omitted;
-// the private key alias and all cryptographic identity bytes must survive.
+// certificates valid for 100 years. OpenSSL labels the leaf certificate and the
+// key "identity" and leaves the CA unlabelled; the labels and all cryptographic
+// identity bytes must survive.
 const UNICODE_SUBJECT_CHAIN: &[u8] = include_bytes!("assets/unicode-subject-chain.p12");
 
 #[test]
@@ -111,7 +134,7 @@ fn unicode_certificate_subjects_round_trip_without_generated_friendly_names() {
     for (actual, expected) in rewritten.certs.iter().zip(&original.certs) {
         assert_eq!(actual.cert.as_der(), expected.cert.as_der());
         assert_eq!(actual.local_key_id, expected.local_key_id);
-        assert!(actual.friendly_name.is_none());
+        assert_eq!(actual.friendly_name, expected.friendly_name);
         assert!(!actual.trusted);
     }
     let reopened = KeyStore::from_pkcs12(&bytes, "new-password", Pkcs12ImportPolicy::Strict).unwrap();
